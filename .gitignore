@@ -1,0 +1,65 @@
+# ===== Backend (Go) =====
+backend/server
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+backend/.env
+backend/config.local.yaml
+backend/.vscode/
+backend/.idea/
+
+# ===== Frontend (Vue + Vite) =====
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/*.local
+frontend/.vite/
+frontend/.vscode/
+frontend/.idea/
+frontend/.cache/
+frontend/coverage/
+
+# ===== Logs =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+*.pid.lock
+
+# ===== OS =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===== Build artifacts =====
+*.tgz
+*.tar.gz
+*.zip
+*.rar
+
+# ===== Secrets / Local config =====
+*.pem
+*.key
+*.crt
+.env
+.env.*
+secrets/
+
+# ===== Local tools (Playwright screenshots, debug logs) =====
+.playwright-mcp/
+.playwright-cache/
+debug.log
+
