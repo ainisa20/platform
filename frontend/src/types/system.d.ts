@@ -448,6 +448,7 @@ export interface ShopCustomerResp {
   status: number
   created_at: string
   created_by: number
+  created_by_name?: string
   updated_at: string
   updated_by: number
 }
@@ -455,6 +456,7 @@ export interface ShopCustomerResp {
 export interface ShopCustomerListReq extends PageReq {
   customer_name?: string
   contact_person?: string
+  customer_type?: number | null
   status?: number | null
 }
 

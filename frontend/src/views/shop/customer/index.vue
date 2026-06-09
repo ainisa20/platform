@@ -24,6 +24,7 @@ const total = ref(0)
 const searchForm = reactive({
   customer_name: '',
   contact_person: '',
+  customer_type: null as number | null,
   status: null as number | null,
 })
 
@@ -37,6 +38,7 @@ async function fetchList() {
       page_size: pagination.page_size,
       customer_name: searchForm.customer_name || undefined,
       contact_person: searchForm.contact_person || undefined,
+      customer_type: searchForm.customer_type ?? undefined,
       status: searchForm.status ?? undefined,
     })
     tableData.value = res.data.data.list
@@ -54,6 +56,7 @@ function handleSearch() {
 function handleReset() {
   searchForm.customer_name = ''
   searchForm.contact_person = ''
+  searchForm.customer_type = null
   searchForm.status = null
   pagination.page = 1
   fetchList()
@@ -223,7 +226,7 @@ async function handleExport() {
     c.contact_email,
     c.address,
     c.status === 1 ? '启用' : '停用',
-    String(c.created_by),
+    c.created_by_name || String(c.created_by),
     formatTime(c.created_at),
   ])
   const csv = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -279,6 +282,12 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="联系人">
           <el-input v-model="searchForm.contact_person" placeholder="请输入联系人" clearable />
+        </el-form-item>
+        <el-form-item label="客户类型">
+          <el-select v-model="searchForm.customer_type" placeholder="全部" clearable style="width: 120px">
+            <el-option label="个人" :value="1" />
+            <el-option label="企业" :value="2" />
+          </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px">
@@ -337,7 +346,7 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="创建人" min-width="100">
           <template #default="{ row }">
-            {{ row.created_by || '-' }}
+            {{ row.created_by_name || row.created_by || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="创建时间" min-width="170">
