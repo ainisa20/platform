@@ -497,11 +497,12 @@ type ShopCustomerUpdateReq struct {
 }
 
 type ShopCustomerListReq struct {
-	Page          int    `form:"page"`
-	PageSize      int    `form:"page_size"`
-	CustomerName  string `form:"customer_name"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
+	CustomerName string `form:"customer_name"`
 	ContactPerson string `form:"contact_person"`
-	Status        *int16 `form:"status"`
+	CustomerType *int16 `form:"customer_type"`
+	Status       *int16 `form:"status"`
 }
 
 type ShopCustomerResp struct {
@@ -516,6 +517,7 @@ type ShopCustomerResp struct {
 	Status        int16     `json:"status"`
 	CreatedAt     time.Time `json:"created_at"`
 	CreatedBy     uint64    `json:"created_by"`
+	CreatedByName string    `json:"created_by_name"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	UpdatedBy     uint64    `json:"updated_by"`
 }

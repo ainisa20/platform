@@ -30,6 +30,9 @@ func (s *ShopCustomerService) List(c *gin.Context, db *gorm.DB, tenantID uint64,
 	if req.ContactPerson != "" {
 		q = q.Where("contact_person LIKE ?", "%"+req.ContactPerson+"%")
 	}
+	if req.CustomerType != nil {
+		q = q.Where("customer_type = ?", *req.CustomerType)
+	}
 	if req.Status != nil {
 		q = q.Where("status = ?", *req.Status)
 	}
@@ -54,9 +57,13 @@ func (s *ShopCustomerService) List(c *gin.Context, db *gorm.DB, tenantID uint64,
 		return nil, 0, err
 	}
 
+	nameMap := s.fetchUserNames(db, collectCreatedBy(customers))
+
 	list := make([]dto.ShopCustomerResp, 0, len(customers))
 	for i := range customers {
-		list = append(list, shopCustomerToResp(&customers[i]))
+		resp := shopCustomerToResp(&customers[i])
+		resp.CreatedByName = nameMap[customers[i].CreatedBy]
+		list = append(list, resp)
 	}
 	return list, total, nil
 }
@@ -72,6 +79,10 @@ func (s *ShopCustomerService) Get(c *gin.Context, db *gorm.DB, id, tenantID uint
 		return nil, err
 	}
 	resp := shopCustomerToResp(&customer)
+	if customer.CreatedBy != 0 {
+		nameMap := s.fetchUserNames(db, []uint64{customer.CreatedBy})
+		resp.CreatedByName = nameMap[customer.CreatedBy]
+	}
 	return &resp, nil
 }
 
@@ -110,6 +121,10 @@ func (s *ShopCustomerService) Create(c *gin.Context, db *gorm.DB, tenantID, crea
 	}
 
 	resp := shopCustomerToResp(customer)
+	if createdBy != 0 {
+		nameMap := s.fetchUserNames(db, []uint64{createdBy})
+		resp.CreatedByName = nameMap[createdBy]
+	}
 	return &resp, nil
 }
 
@@ -194,6 +209,9 @@ func (s *ShopCustomerService) Export(c *gin.Context, db *gorm.DB, tenantID uint6
 	if req.ContactPerson != "" {
 		q = q.Where("contact_person LIKE ?", "%"+req.ContactPerson+"%")
 	}
+	if req.CustomerType != nil {
+		q = q.Where("customer_type = ?", *req.CustomerType)
+	}
 	if req.Status != nil {
 		q = q.Where("status = ?", *req.Status)
 	}
@@ -203,11 +221,53 @@ func (s *ShopCustomerService) Export(c *gin.Context, db *gorm.DB, tenantID uint6
 		return nil, err
 	}
 
+	nameMap := s.fetchUserNames(db, collectCreatedBy(customers))
+
 	list := make([]dto.ShopCustomerResp, 0, len(customers))
 	for i := range customers {
-		list = append(list, shopCustomerToResp(&customers[i]))
+		resp := shopCustomerToResp(&customers[i])
+		resp.CreatedByName = nameMap[customers[i].CreatedBy]
+		list = append(list, resp)
 	}
 	return list, nil
+}
+
+func (s *ShopCustomerService) fetchUserNames(db *gorm.DB, ids []uint64) map[uint64]string {
+	result := make(map[uint64]string, len(ids))
+	if len(ids) == 0 {
+		return result
+	}
+	type row struct {
+		ID       uint64
+		RealName string
+	}
+	var rows []row
+	if err := db.Table("sys_user").
+		Select("id, real_name").
+		Where("id IN ?", ids).
+		Scan(&rows).Error; err != nil {
+		return result
+	}
+	for _, r := range rows {
+		result[r.ID] = r.RealName
+	}
+	return result
+}
+
+func collectCreatedBy(customers []entity.ShopCustomer) []uint64 {
+	idSet := make(map[uint64]struct{}, len(customers))
+	ids := make([]uint64, 0, len(customers))
+	for _, c := range customers {
+		if c.CreatedBy == 0 {
+			continue
+		}
+		if _, ok := idSet[c.CreatedBy]; ok {
+			continue
+		}
+		idSet[c.CreatedBy] = struct{}{}
+		ids = append(ids, c.CreatedBy)
+	}
+	return ids
 }
 
 func shopCustomerToResp(c *entity.ShopCustomer) dto.ShopCustomerResp {
