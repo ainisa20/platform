@@ -31,4 +31,17 @@ VALUES (
     (SELECT id FROM sys_role WHERE tenant_id = 0 AND role_code = 'platform_admin' LIMIT 1)
 );
 
+-- Assign ALL platform permissions to platform_admin role
+-- This must run AFTER permission sync has populated sys_permission.
+-- Use ON CONFLICT DO NOTHING so it is idempotent.
+INSERT INTO sys_role_permission (tenant_id, role_id, permission_id)
+SELECT
+    0,
+    (SELECT id FROM sys_role WHERE tenant_id = 0 AND role_code = 'platform_admin' LIMIT 1),
+    p.id
+FROM sys_permission p
+WHERE p.system_type = 'platform'
+  AND p.perms_code != ''
+ON CONFLICT DO NOTHING;
+
 COMMIT;
