@@ -25,7 +25,7 @@ func NewDeptService(deptRepo shop.DeptRepository, userRepo shop.UserRepository) 
 
 func (s *DeptService) Create(db *gorm.DB, tenantID, createdBy uint64, req *dto.DeptCreateReq) (*entity.SysDept, error) {
 	if req.ParentID > 0 {
-		if _, err := s.deptRepo.GetByID(db, req.ParentID); err != nil {
+		if _, err := s.deptRepo.GetByIDInTenant(db, req.ParentID, tenantID); err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, shared.ErrDeptNotFound
 			}
@@ -56,8 +56,8 @@ func (s *DeptService) Create(db *gorm.DB, tenantID, createdBy uint64, req *dto.D
 	return dept, nil
 }
 
-func (s *DeptService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.DeptUpdateReq) error {
-	dept, err := s.deptRepo.GetByID(db, id)
+func (s *DeptService) Update(db *gorm.DB, tenantID, id, updatedBy uint64, req *dto.DeptUpdateReq) error {
+	dept, err := s.deptRepo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrDeptNotFound
@@ -67,6 +67,15 @@ func (s *DeptService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.DeptUpd
 
 	if req.ParentID == id {
 		return shared.ErrSameDeptParent
+	}
+
+	if req.ParentID > 0 {
+		if _, err := s.deptRepo.GetByIDInTenant(db, req.ParentID, tenantID); err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return shared.ErrDeptNotFound
+			}
+			return err
+		}
 	}
 
 	descendantIDs, _ := s.deptRepo.GetDescendantIDs(db, id, dept.TenantID)
@@ -90,7 +99,7 @@ func (s *DeptService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.DeptUpd
 
 	if parentChanged {
 		if req.ParentID > 0 {
-			parent, err := s.deptRepo.GetByID(db, req.ParentID)
+			parent, err := s.deptRepo.GetByIDInTenant(db, req.ParentID, tenantID)
 			if err != nil {
 				return shared.ErrDeptNotFound
 			}
@@ -118,7 +127,7 @@ func (s *DeptService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.DeptUpd
 }
 
 func (s *DeptService) Delete(db *gorm.DB, id, tenantID uint64) error {
-	dept, err := s.deptRepo.GetByID(db, id)
+	dept, err := s.deptRepo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrDeptNotFound
@@ -126,7 +135,7 @@ func (s *DeptService) Delete(db *gorm.DB, id, tenantID uint64) error {
 		return err
 	}
 
-	count, err := s.deptRepo.CountUsersByDeptID(db, id)
+	count, err := s.deptRepo.CountUsersByDeptIDInTenant(db, id, tenantID)
 	if err != nil {
 		return err
 	}

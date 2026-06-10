@@ -12,10 +12,11 @@ type ShopFinCategoryRepository interface {
 	FindByPlatformID(db *gorm.DB, tenantID uint64, platformID uint64) (*entity.ShopFinanceCategory, error)
 	FindByPlatformIDs(db *gorm.DB, tenantID uint64, platformIDs []uint64) ([]entity.ShopFinanceCategory, error)
 	Create(db *gorm.DB, cat *entity.ShopFinanceCategory) error
-	Delete(db *gorm.DB, id uint64) error
+	Delete(db *gorm.DB, id, tenantID uint64) error
 	HasReference(db *gorm.DB, id uint64) (bool, error)
 	HasChildren(db *gorm.DB, id uint64) (bool, error)
 	GetByID(db *gorm.DB, id uint64) (*entity.ShopFinanceCategory, error)
+	GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.ShopFinanceCategory, error)
 }
 
 type shopFinCategoryRepository struct{}
@@ -59,8 +60,8 @@ func (r *shopFinCategoryRepository) Create(db *gorm.DB, cat *entity.ShopFinanceC
 	return db.Create(cat).Error
 }
 
-func (r *shopFinCategoryRepository) Delete(db *gorm.DB, id uint64) error {
-	return db.Delete(&entity.ShopFinanceCategory{}, id).Error
+func (r *shopFinCategoryRepository) Delete(db *gorm.DB, id, tenantID uint64) error {
+	return db.Where("id = ? AND tenant_id = ?", id, tenantID).Delete(&entity.ShopFinanceCategory{}).Error
 }
 
 func (r *shopFinCategoryRepository) HasReference(db *gorm.DB, id uint64) (bool, error) {
@@ -85,6 +86,14 @@ func (r *shopFinCategoryRepository) HasChildren(db *gorm.DB, id uint64) (bool, e
 func (r *shopFinCategoryRepository) GetByID(db *gorm.DB, id uint64) (*entity.ShopFinanceCategory, error) {
 	var cat entity.ShopFinanceCategory
 	if err := db.First(&cat, id).Error; err != nil {
+		return nil, err
+	}
+	return &cat, nil
+}
+
+func (r *shopFinCategoryRepository) GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.ShopFinanceCategory, error) {
+	var cat entity.ShopFinanceCategory
+	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&cat).Error; err != nil {
 		return nil, err
 	}
 	return &cat, nil

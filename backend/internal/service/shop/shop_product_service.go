@@ -130,44 +130,39 @@ func (s *ShopProductService) Select(db *gorm.DB, tenantID, createdBy uint64, req
 }
 
 func (s *ShopProductService) UpdatePrice(db *gorm.DB, tenantID, id, updatedBy uint64, req *dto.ShopProductPriceReq) error {
-	sp, err := s.repo.GetByID(db, id)
+	sp, err := s.repo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrShopProductNotFound
 		}
 		return err
 	}
-	_ = tenantID
 	sp.ShopPrice = req.ShopPrice
 	sp.UpdatedBy = updatedBy
 	return s.repo.Update(db, sp)
 }
 
 func (s *ShopProductService) UpdateStatus(db *gorm.DB, tenantID, id, updatedBy uint64, req *dto.ShopProductStatusReq) error {
-	sp, err := s.repo.GetByID(db, id)
+	sp, err := s.repo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrShopProductNotFound
 		}
 		return err
 	}
-	_ = tenantID
 	sp.Status = req.Status
 	sp.UpdatedBy = updatedBy
 	return s.repo.Update(db, sp)
 }
 
 func (s *ShopProductService) DeleteSelection(db *gorm.DB, tenantID, id uint64) error {
-	sp, err := s.repo.GetByID(db, id)
-	if err != nil {
+	if _, err := s.repo.GetByIDInTenant(db, id, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrShopProductNotFound
 		}
 		return err
 	}
-	_ = sp
-	_ = tenantID
-	return s.repo.Delete(db, id)
+	return s.repo.Delete(db, id, tenantID)
 }
 
 func shopProductToResp(sp *entity.ShopProduct) dto.ShopProductResp {

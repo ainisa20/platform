@@ -18,16 +18,28 @@ var (
 	rbacRDB *redis.Client
 )
 
-// InitRBAC initialises the DB and Redis clients used by PermissionMiddleware.
-// Call this once during application startup.
 func InitRBAC(db *gorm.DB, rdb *redis.Client) {
 	rbacDB = db
 	rbacRDB = rdb
 }
 
-// PermissionMiddleware checks that the authenticated user possesses the
-// required permission code. Permission codes are cached in Redis with a
-// 30-minute TTL; on cache miss they are loaded from the database.
+// permImplies maps a permission to the permissions it automatically implies.
+// When a user holds the key permission, they can also pass checks for the
+// implied permissions without explicit assignment.
+var permImplies = map[string][]string{
+	"platform:user:list":         {"platform:role:list", "platform:dept:list"},
+	"platform:role:list":         {"platform:dept:list"},
+	"platform:product:list":      {"platform:product:category:list"},
+	"platform:product:create":    {"platform:product:category:list"},
+	"platform:product:update":    {"platform:product:category:list"},
+	"shop:user:list":             {"shop:role:list", "shop:dept:list"},
+	"shop:role:list":             {"shop:dept:list"},
+	"shop:product:list":          {"shop:finance:category:list"},
+	"shop:finance:record:list":   {"shop:finance:category:list", "shop:finance:account:list"},
+	"shop:finance:record:create": {"shop:finance:category:list", "shop:finance:account:list"},
+	"shop:order:create":          {"shop:customer:list", "shop:product:list"},
+}
+
 func PermissionMiddleware(requiredPerm string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := getContextUint64(c, "user_id")
@@ -40,16 +52,37 @@ func PermissionMiddleware(requiredPerm string) gin.HandlerFunc {
 			return
 		}
 
-		for _, p := range perms {
-			if p == requiredPerm {
-				c.Next()
-				return
-			}
+		if hasPermission(perms, requiredPerm) {
+			c.Next()
+			return
 		}
 
 		response.Forbidden(c, "insufficient permissions")
 		c.Abort()
 	}
+}
+
+func hasPermission(perms []string, required string) bool {
+	permSet := make(map[string]struct{}, len(perms))
+	for _, p := range perms {
+		permSet[p] = struct{}{}
+	}
+
+	if _, ok := permSet[required]; ok {
+		return true
+	}
+
+	for p := range permSet {
+		if implied, exists := permImplies[p]; exists {
+			for _, imp := range implied {
+				if imp == required {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func getUserPermissionCodes(ctx context.Context, userID, tenantID uint64) ([]string, error) {

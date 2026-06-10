@@ -75,6 +75,7 @@ func (ctrl *SysRoleCtrl) Create(c *gin.Context) {
 
 func (ctrl *SysRoleCtrl) Update(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	userID := c.GetUint64("user_id")
 	id, err := parseID(c)
 	if err != nil {
@@ -88,7 +89,7 @@ func (ctrl *SysRoleCtrl) Update(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.svc.Update(db, id, userID, &req); err != nil {
+	if err := ctrl.svc.Update(db, tenantID, id, userID, &req); err != nil {
 		handleError(c, err)
 		return
 	}
@@ -97,13 +98,14 @@ func (ctrl *SysRoleCtrl) Update(c *gin.Context) {
 
 func (ctrl *SysRoleCtrl) Delete(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	id, err := parseID(c)
 	if err != nil {
 		response.BadRequest(c, "invalid id")
 		return
 	}
 
-	if err := ctrl.svc.Delete(db, id); err != nil {
+	if err := ctrl.svc.Delete(db, id, tenantID); err != nil {
 		handleError(c, err)
 		return
 	}

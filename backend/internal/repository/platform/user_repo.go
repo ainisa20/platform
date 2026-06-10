@@ -13,6 +13,7 @@ type UserRepository interface {
 	Delete(db *gorm.DB, id uint64) error
 	GetByID(db *gorm.DB, id uint64) (*entity.SysUser, error)
 	GetByUsername(db *gorm.DB, tenantID uint64, username string) (*entity.SysUser, error)
+	GetByUsernameGlobal(db *gorm.DB, username string) (*entity.SysUser, error)
 	List(db *gorm.DB, tenantID uint64, req *dto.UserListReq) ([]entity.SysUser, int64, error)
 	AssignRoles(db *gorm.DB, userID uint64, roleIDs []uint64) error
 	GetRoleIDs(db *gorm.DB, userID uint64) ([]uint64, error)
@@ -48,6 +49,16 @@ func (r *userRepository) GetByID(db *gorm.DB, id uint64) (*entity.SysUser, error
 func (r *userRepository) GetByUsername(db *gorm.DB, tenantID uint64, username string) (*entity.SysUser, error) {
 	var user entity.SysUser
 	if err := db.Where("tenant_id = ? AND username = ?", tenantID, username).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetByUsernameGlobal returns the user with the given username across all tenants.
+// Used to enforce global uniqueness constraints (e.g. shop admin username).
+func (r *userRepository) GetByUsernameGlobal(db *gorm.DB, username string) (*entity.SysUser, error) {
+	var user entity.SysUser
+	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil

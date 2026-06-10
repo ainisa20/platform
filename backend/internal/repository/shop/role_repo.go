@@ -10,8 +10,9 @@ import (
 type RoleRepository interface {
 	Create(db *gorm.DB, role *entity.SysRole) error
 	Update(db *gorm.DB, role *entity.SysRole) error
-	Delete(db *gorm.DB, id uint64) error
+	Delete(db *gorm.DB, id, tenantID uint64) error
 	GetByID(db *gorm.DB, id uint64) (*entity.SysRole, error)
+	GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.SysRole, error)
 	GetByIDs(db *gorm.DB, ids []uint64) ([]entity.SysRole, error)
 	GetByCode(db *gorm.DB, tenantID uint64, roleCode string) (*entity.SysRole, error)
 	List(db *gorm.DB, tenantID uint64, req *dto.RoleListReq) ([]entity.SysRole, int64, error)
@@ -37,13 +38,21 @@ func (r *roleRepository) Update(db *gorm.DB, role *entity.SysRole) error {
 	return db.Save(role).Error
 }
 
-func (r *roleRepository) Delete(db *gorm.DB, id uint64) error {
-	return db.Delete(&entity.SysRole{}, id).Error
+func (r *roleRepository) Delete(db *gorm.DB, id, tenantID uint64) error {
+	return db.Where("id = ? AND tenant_id = ?", id, tenantID).Delete(&entity.SysRole{}, id).Error
 }
 
 func (r *roleRepository) GetByID(db *gorm.DB, id uint64) (*entity.SysRole, error) {
 	var role entity.SysRole
 	if err := db.First(&role, id).Error; err != nil {
+		return nil, err
+	}
+	return &role, nil
+}
+
+func (r *roleRepository) GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.SysRole, error) {
+	var role entity.SysRole
+	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&role).Error; err != nil {
 		return nil, err
 	}
 	return &role, nil

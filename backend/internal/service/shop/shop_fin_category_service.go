@@ -47,10 +47,12 @@ func (s *ShopFinCategoryService) ListAvailable(db *gorm.DB) ([]dto.ShopFinCatego
 }
 
 func (s *ShopFinCategoryService) Sync(db *gorm.DB, tenantID, createdBy uint64, req *dto.ShopFinCategorySyncReq) error {
-	allSynced, _ := s.repo.ListSynced(db, tenantID, &dto.ShopFinCategoryListReq{})
-	syncedMap := make(map[uint64]bool, len(allSynced))
-	for _, sc := range allSynced {
-		syncedMap[sc.PlatformCategoryID] = true
+	syncedMap := make(map[uint64]bool)
+	for _, pid := range req.PlatformCategoryIDs {
+		existing, err := s.repo.FindByPlatformID(db, tenantID, pid)
+		if err == nil && existing != nil {
+			syncedMap[pid] = true
+		}
 	}
 
 	toSync := make(map[uint64]*entity.FinanceCategory)
@@ -106,14 +108,14 @@ func (s *ShopFinCategoryService) Sync(db *gorm.DB, tenantID, createdBy uint64, r
 }
 
 func (s *ShopFinCategoryService) CancelSync(db *gorm.DB, tenantID, id, userID uint64) error {
-	cat, err := s.repo.GetByID(db, id)
+	_, err := s.repo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrShopFinCategoryNotFound
 		}
 		return err
 	}
-	_ = cat
+	_ = userID
 
 	hasRef, err := s.repo.HasReference(db, id)
 	if err != nil {
@@ -131,7 +133,7 @@ func (s *ShopFinCategoryService) CancelSync(db *gorm.DB, tenantID, id, userID ui
 		return shared.ErrFinanceCategoryHasChildren
 	}
 
-	return s.repo.Delete(db, id)
+	return s.repo.Delete(db, id, tenantID)
 }
 
 func (s *ShopFinCategoryService) walkAncestors(db *gorm.DB, cat *entity.FinanceCategory, toSync map[uint64]*entity.FinanceCategory, syncedMap map[uint64]bool) {

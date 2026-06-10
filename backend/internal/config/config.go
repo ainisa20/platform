@@ -48,10 +48,11 @@ type RedisConfig struct {
 }
 
 type MinIOConfig struct {
-	Endpoint  string `mapstructure:"endpoint"`
-	AccessKey string `mapstructure:"access_key"`
-	SecretKey string `mapstructure:"secret_key"`
-	SSL       bool   `mapstructure:"ssl"`
+	Endpoint       string `mapstructure:"endpoint"`
+	PublicEndpoint string `mapstructure:"public_endpoint"`
+	AccessKey      string `mapstructure:"access_key"`
+	SecretKey      string `mapstructure:"secret_key"`
+	SSL            bool   `mapstructure:"ssl"`
 }
 
 type JWTConfig struct {
@@ -78,6 +79,7 @@ func Load(path string) *Config {
 	setEnvIfSet("REDIS_PASSWORD", "redis.password")
 	setEnvIfSet("REDIS_DB", "redis.db")
 	setEnvIfSet("MINIO_ENDPOINT", "minio.endpoint")
+	setEnvIfSet("MINIO_PUBLIC_ENDPOINT", "minio.public_endpoint")
 	setEnvIfSet("MINIO_ACCESS_KEY", "minio.access_key")
 	setEnvIfSet("MINIO_SECRET_KEY", "minio.secret_key")
 	setEnvIfSet("MINIO_SSL", "minio.ssl")

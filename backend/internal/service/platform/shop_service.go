@@ -73,7 +73,7 @@ func (s *ShopService) Create(db *gorm.DB, createdBy uint64, req *dto.ShopCreateR
 	if existing, err := s.shopRepo.GetByCode(db, req.ShopCode); err == nil && existing != nil {
 		return nil, shared.ErrShopCodeExists
 	}
-	if existing, err := s.userRepo.GetByUsername(db, 0, req.AdminUsername); err == nil && existing != nil {
+	if existing, err := s.userRepo.GetByUsernameGlobal(db, req.AdminUsername); err == nil && existing != nil {
 		return nil, shared.ErrUsernameExists
 	}
 
@@ -83,16 +83,20 @@ func (s *ShopService) Create(db *gorm.DB, createdBy uint64, req *dto.ShopCreateR
 	}
 
 	shop := &entity.SysShop{
-		ShopCode: req.ShopCode,
-		ShopName: req.ShopName,
-		Contact:  req.Contact,
-		Phone:    req.Phone,
-		Email:    req.Email,
-		Address:  req.Address,
-		Remark:   req.Remark,
-		Status:   1,
-		CreatedBy: createdBy,
-		UpdatedBy: createdBy,
+		ShopCode:      req.ShopCode,
+		ShopName:      req.ShopName,
+		Contact:       req.Contact,
+		Phone:         req.Phone,
+		Email:         req.Email,
+		Province:      req.Province,
+		City:          req.City,
+		District:      req.District,
+		DetailAddress: req.DetailAddress,
+		Address:       req.Address,
+		Remark:        req.Remark,
+		Status:        1,
+		CreatedBy:     createdBy,
+		UpdatedBy:     createdBy,
 	}
 
 	err := db.Transaction(func(tx *gorm.DB) error {
@@ -187,21 +191,46 @@ func (s *ShopService) Create(db *gorm.DB, createdBy uint64, req *dto.ShopCreateR
 }
 
 func (s *ShopService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.ShopUpdateReq) error {
-	shop, err := s.shopRepo.GetByID(db, id)
-	if err != nil {
+	if _, err := s.shopRepo.GetByID(db, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrShopNotFound
 		}
 		return err
 	}
-	shop.ShopName = req.ShopName
-	shop.Contact = req.Contact
-	shop.Phone = req.Phone
-	shop.Email = req.Email
-	shop.Address = req.Address
-	shop.Remark = req.Remark
-	shop.UpdatedBy = updatedBy
-	return s.shopRepo.Update(db, shop)
+
+	updates := map[string]interface{}{"updated_by": updatedBy}
+	if req.ShopName != "" {
+		updates["shop_name"] = req.ShopName
+	}
+	if req.Contact != "" {
+		updates["contact"] = req.Contact
+	}
+	if req.Phone != "" {
+		updates["phone"] = req.Phone
+	}
+	if req.Email != "" {
+		updates["email"] = req.Email
+	}
+	if req.Province != "" {
+		updates["province"] = req.Province
+	}
+	if req.City != "" {
+		updates["city"] = req.City
+	}
+	if req.District != "" {
+		updates["district"] = req.District
+	}
+	if req.DetailAddress != "" {
+		updates["detail_address"] = req.DetailAddress
+	}
+	if req.Address != "" {
+		updates["address"] = req.Address
+	}
+	if req.Remark != "" {
+		updates["remark"] = req.Remark
+	}
+
+	return db.Model(&entity.SysShop{}).Where("id = ?", id).Updates(updates).Error
 }
 
 func (s *ShopService) UpdateStatus(db *gorm.DB, id uint64, status int16) error {
@@ -251,20 +280,24 @@ func (s *ShopService) ResetAdminPassword(db *gorm.DB, id uint64, newPassword str
 
 func (s *ShopService) shopToResp(s2 *entity.SysShop) dto.ShopResp {
 	return dto.ShopResp{
-		ID:           s2.ID,
-		ShopCode:     s2.ShopCode,
-		ShopName:     s2.ShopName,
-		Contact:      s2.Contact,
-		Phone:        s2.Phone,
-		Email:        s2.Email,
-		Address:      s2.Address,
-		Remark:       s2.Remark,
-		Status:       s2.Status,
-		AdminUserID:  s2.AdminUserID,
-		ExpiresAt:    s2.ExpiresAt,
-		CreatedAt:    s2.CreatedAt,
-		CreatedBy:    s2.CreatedBy,
-		UpdatedAt:    s2.UpdatedAt,
-		UpdatedBy:    s2.UpdatedBy,
+		ID:            s2.ID,
+		ShopCode:      s2.ShopCode,
+		ShopName:      s2.ShopName,
+		Contact:       s2.Contact,
+		Phone:         s2.Phone,
+		Email:         s2.Email,
+		Province:      s2.Province,
+		City:          s2.City,
+		District:      s2.District,
+		DetailAddress: s2.DetailAddress,
+		Address:       s2.Address,
+		Remark:        s2.Remark,
+		Status:        s2.Status,
+		AdminUserID:   s2.AdminUserID,
+		ExpiresAt:     s2.ExpiresAt,
+		CreatedAt:     s2.CreatedAt,
+		CreatedBy:     s2.CreatedBy,
+		UpdatedAt:     s2.UpdatedAt,
+		UpdatedBy:     s2.UpdatedBy,
 	}
 }

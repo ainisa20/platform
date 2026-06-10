@@ -106,7 +106,7 @@ func (s *UserService) Create(db *gorm.DB, tenantID, createdBy uint64, req *dto.U
 	}
 
 	if len(req.RoleIDs) > 0 {
-		if err := s.userRepo.AssignRoles(db, user.ID, req.RoleIDs); err != nil {
+		if err := s.userRepo.AssignRoles(db, user.ID, tenantID, req.RoleIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -161,7 +161,7 @@ func (s *UserService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.UserUpd
 		}
 	}
 
-	user, err := s.userRepo.GetByID(db, id)
+	_, err := s.userRepo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrUserNotFound
@@ -186,12 +186,14 @@ func (s *UserService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.UserUpd
 		updates["status"] = req.Status
 	}
 
-	if err := db.Model(user).Updates(updates).Error; err != nil {
+	if err := db.Model(&entity.SysUser{}).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Updates(updates).Error; err != nil {
 		return err
 	}
 
 	if req.RoleIDs != nil {
-		if err := s.userRepo.AssignRoles(db, id, req.RoleIDs); err != nil {
+		if err := s.userRepo.AssignRoles(db, id, tenantID, req.RoleIDs); err != nil {
 			return err
 		}
 	}
@@ -199,14 +201,14 @@ func (s *UserService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.UserUpd
 	return nil
 }
 
-func (s *UserService) Delete(db *gorm.DB, id uint64) error {
-	if _, err := s.userRepo.GetByID(db, id); err != nil {
+func (s *UserService) Delete(db *gorm.DB, id, tenantID uint64) error {
+	if _, err := s.userRepo.GetByIDInTenant(db, id, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrUserNotFound
 		}
 		return err
 	}
-	return s.userRepo.Delete(db, id)
+	return s.userRepo.Delete(db, id, tenantID)
 }
 
 func (s *UserService) GetByID(db *gorm.DB, id uint64) (*dto.UserResp, error) {
@@ -242,8 +244,8 @@ func (s *UserService) List(c *gin.Context, db *gorm.DB, tenantID uint64, req *dt
 	return resps, total, nil
 }
 
-func (s *UserService) ResetPassword(db *gorm.DB, id uint64, req *dto.PasswordResetReq) error {
-	if _, err := s.userRepo.GetByID(db, id); err != nil {
+func (s *UserService) ResetPassword(db *gorm.DB, id, tenantID uint64, req *dto.PasswordResetReq) error {
+	if _, err := s.userRepo.GetByIDInTenant(db, id, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrUserNotFound
 		}
@@ -255,17 +257,17 @@ func (s *UserService) ResetPassword(db *gorm.DB, id uint64, req *dto.PasswordRes
 		return fmt.Errorf("bcrypt failed: %w", err)
 	}
 
-	return s.userRepo.UpdatePassword(db, id, string(hashedPwd))
+	return s.userRepo.UpdatePassword(db, id, tenantID, string(hashedPwd))
 }
 
-func (s *UserService) AssignRoles(db *gorm.DB, userID uint64, roleIDs []uint64) error {
-	if _, err := s.userRepo.GetByID(db, userID); err != nil {
+func (s *UserService) AssignRoles(db *gorm.DB, userID, tenantID uint64, roleIDs []uint64) error {
+	if _, err := s.userRepo.GetByIDInTenant(db, userID, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrUserNotFound
 		}
 		return err
 	}
-	return s.userRepo.AssignRoles(db, userID, roleIDs)
+	return s.userRepo.AssignRoles(db, userID, tenantID, roleIDs)
 }
 
 func (s *UserService) loadRolesBrief(db *gorm.DB, roleIDs []uint64) ([]dto.RoleResp, error) {

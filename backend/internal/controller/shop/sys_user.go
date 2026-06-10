@@ -109,13 +109,14 @@ func (ctrl *SysUserCtrl) Update(c *gin.Context) {
 
 func (ctrl *SysUserCtrl) Delete(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	id, err := parseID(c)
 	if err != nil {
 		response.BadRequest(c, "invalid id")
 		return
 	}
 
-	if err := ctrl.svc.Delete(db, id); err != nil {
+	if err := ctrl.svc.Delete(db, id, tenantID); err != nil {
 		handleError(c, err)
 		return
 	}
@@ -124,6 +125,7 @@ func (ctrl *SysUserCtrl) Delete(c *gin.Context) {
 
 func (ctrl *SysUserCtrl) AssignRoles(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	id, err := parseID(c)
 	if err != nil {
 		response.BadRequest(c, "invalid id")
@@ -138,7 +140,7 @@ func (ctrl *SysUserCtrl) AssignRoles(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.svc.AssignRoles(db, id, req.RoleIDs); err != nil {
+	if err := ctrl.svc.AssignRoles(db, id, tenantID, req.RoleIDs); err != nil {
 		handleError(c, err)
 		return
 	}
@@ -147,6 +149,7 @@ func (ctrl *SysUserCtrl) AssignRoles(c *gin.Context) {
 
 func (ctrl *SysUserCtrl) ResetPassword(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	id, err := parseID(c)
 	if err != nil {
 		response.BadRequest(c, "invalid id")
@@ -159,7 +162,7 @@ func (ctrl *SysUserCtrl) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.svc.ResetPassword(db, id, &req); err != nil {
+	if err := ctrl.svc.ResetPassword(db, id, tenantID, &req); err != nil {
 		handleError(c, err)
 		return
 	}

@@ -56,8 +56,8 @@ func (s *RoleService) Create(db *gorm.DB, tenantID, createdBy uint64, req *dto.R
 	return role, nil
 }
 
-func (s *RoleService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.RoleUpdateReq) error {
-	role, err := s.roleRepo.GetByID(db, id)
+func (s *RoleService) Update(db *gorm.DB, tenantID, id, updatedBy uint64, req *dto.RoleUpdateReq) error {
+	role, err := s.roleRepo.GetByIDInTenant(db, id, tenantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrRoleNotFound
@@ -86,14 +86,14 @@ func (s *RoleService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.RoleUpd
 	return s.roleRepo.Update(db, role)
 }
 
-func (s *RoleService) Delete(db *gorm.DB, id uint64) error {
-	if _, err := s.roleRepo.GetByID(db, id); err != nil {
+func (s *RoleService) Delete(db *gorm.DB, id, tenantID uint64) error {
+	if _, err := s.roleRepo.GetByIDInTenant(db, id, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrRoleNotFound
 		}
 		return err
 	}
-	return s.roleRepo.Delete(db, id)
+	return s.roleRepo.Delete(db, id, tenantID)
 }
 
 func (s *RoleService) GetByID(db *gorm.DB, id, tenantID uint64) (*dto.RoleResp, error) {
@@ -135,7 +135,7 @@ func (s *RoleService) List(db *gorm.DB, tenantID uint64, req *dto.RoleListReq) (
 }
 
 func (s *RoleService) AssignPermissions(db *gorm.DB, roleID, tenantID uint64, req *dto.RoleAssignPermsReq, currentUserID uint64, dataScope int16) error {
-	if _, err := s.roleRepo.GetByID(db, roleID); err != nil {
+	if _, err := s.roleRepo.GetByIDInTenant(db, roleID, tenantID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return shared.ErrRoleNotFound
 		}

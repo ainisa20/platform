@@ -52,6 +52,7 @@ func (ctrl *SysDeptCtrl) Create(c *gin.Context) {
 
 func (ctrl *SysDeptCtrl) Update(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
 	userID := c.GetUint64("user_id")
 	id, err := parseID(c)
 	if err != nil {
@@ -65,7 +66,7 @@ func (ctrl *SysDeptCtrl) Update(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.svc.Update(db, id, userID, &req); err != nil {
+	if err := ctrl.svc.Update(db, tenantID, id, userID, &req); err != nil {
 		handleError(c, err)
 		return
 	}

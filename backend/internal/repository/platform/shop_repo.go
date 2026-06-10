@@ -35,6 +35,15 @@ func (r *shopRepository) List(db *gorm.DB, req *dto.ShopListReq) ([]entity.SysSh
 	if req.ShopName != "" {
 		q = q.Where("shop_name LIKE ?", "%"+req.ShopName+"%")
 	}
+	if req.Province != "" {
+		q = q.Where("province = ?", req.Province)
+	}
+	if req.City != "" {
+		q = q.Where("city = ?", req.City)
+	}
+	if req.District != "" {
+		q = q.Where("district = ?", req.District)
+	}
 	if req.Status != nil {
 		q = q.Where("status = ?", *req.Status)
 	}

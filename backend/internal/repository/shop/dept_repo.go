@@ -13,9 +13,11 @@ type DeptRepository interface {
 	Update(db *gorm.DB, dept *entity.SysDept) error
 	Delete(db *gorm.DB, id, tenantID uint64) error
 	GetByID(db *gorm.DB, id uint64) (*entity.SysDept, error)
+	GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.SysDept, error)
 	ListByTenantID(db *gorm.DB, tenantID uint64) ([]entity.SysDept, error)
 	GetDescendantIDs(db *gorm.DB, deptID, tenantID uint64) ([]uint64, error)
 	CountUsersByDeptID(db *gorm.DB, deptID uint64) (int64, error)
+	CountUsersByDeptIDInTenant(db *gorm.DB, deptID, tenantID uint64) (int64, error)
 	RebuildClosureForSubtree(db *gorm.DB, subtreeIDs []uint64, tenantID uint64) error
 }
 
@@ -78,7 +80,7 @@ func (r *deptRepository) Update(db *gorm.DB, dept *entity.SysDept) error {
 
 func (r *deptRepository) Delete(db *gorm.DB, id, tenantID uint64) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&entity.SysDept{}, id).Error; err != nil {
+		if err := tx.Where("id = ? AND tenant_id = ?", id, tenantID).Delete(&entity.SysDept{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("tenant_id = ? AND (ancestor_id = ? OR descendant_id = ?)",
@@ -92,6 +94,14 @@ func (r *deptRepository) Delete(db *gorm.DB, id, tenantID uint64) error {
 func (r *deptRepository) GetByID(db *gorm.DB, id uint64) (*entity.SysDept, error) {
 	var dept entity.SysDept
 	if err := db.First(&dept, id).Error; err != nil {
+		return nil, err
+	}
+	return &dept, nil
+}
+
+func (r *deptRepository) GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.SysDept, error) {
+	var dept entity.SysDept
+	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&dept).Error; err != nil {
 		return nil, err
 	}
 	return &dept, nil
@@ -122,6 +132,16 @@ func (r *deptRepository) GetDescendantIDs(db *gorm.DB, deptID, tenantID uint64) 
 func (r *deptRepository) CountUsersByDeptID(db *gorm.DB, deptID uint64) (int64, error) {
 	var count int64
 	if err := db.Model(&entity.SysUser{}).Where("dept_id = ?", deptID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *deptRepository) CountUsersByDeptIDInTenant(db *gorm.DB, deptID, tenantID uint64) (int64, error) {
+	var count int64
+	if err := db.Model(&entity.SysUser{}).
+		Where("dept_id = ? AND tenant_id = ?", deptID, tenantID).
+		Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil

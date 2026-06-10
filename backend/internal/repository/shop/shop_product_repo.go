@@ -10,11 +10,12 @@ import (
 type ShopProductRepository interface {
 	List(db *gorm.DB, tenantID uint64, req *dto.ShopProductListReq) ([]entity.ShopProduct, int64, error)
 	GetByID(db *gorm.DB, id uint64) (*entity.ShopProduct, error)
+	GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.ShopProduct, error)
 	FindByPlatformID(db *gorm.DB, tenantID uint64, platformID uint64) (*entity.ShopProduct, error)
 	FindByPlatformIDs(db *gorm.DB, tenantID uint64, platformIDs []uint64) ([]entity.ShopProduct, error)
 	Create(db *gorm.DB, sp *entity.ShopProduct) error
 	Update(db *gorm.DB, sp *entity.ShopProduct) error
-	Delete(db *gorm.DB, id uint64) error
+	Delete(db *gorm.DB, id, tenantID uint64) error
 }
 
 type shopProductRepository struct{}
@@ -63,6 +64,14 @@ func (r *shopProductRepository) GetByID(db *gorm.DB, id uint64) (*entity.ShopPro
 	return &sp, nil
 }
 
+func (r *shopProductRepository) GetByIDInTenant(db *gorm.DB, id, tenantID uint64) (*entity.ShopProduct, error) {
+	var sp entity.ShopProduct
+	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&sp).Error; err != nil {
+		return nil, err
+	}
+	return &sp, nil
+}
+
 func (r *shopProductRepository) FindByPlatformID(db *gorm.DB, tenantID uint64, platformID uint64) (*entity.ShopProduct, error) {
 	var sp entity.ShopProduct
 	if err := db.Where("tenant_id = ? AND platform_product_id = ?", tenantID, platformID).First(&sp).Error; err != nil {
@@ -90,6 +99,6 @@ func (r *shopProductRepository) Update(db *gorm.DB, sp *entity.ShopProduct) erro
 	return db.Save(sp).Error
 }
 
-func (r *shopProductRepository) Delete(db *gorm.DB, id uint64) error {
-	return db.Delete(&entity.ShopProduct{}, id).Error
+func (r *shopProductRepository) Delete(db *gorm.DB, id, tenantID uint64) error {
+	return db.Where("id = ? AND tenant_id = ?", id, tenantID).Delete(&entity.ShopProduct{}).Error
 }
