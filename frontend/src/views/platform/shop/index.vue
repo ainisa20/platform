@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { regionData, codeToText } from 'element-china-area-data'
 import {
   getShopList,
   getShop,
@@ -17,6 +18,28 @@ import type {
   ShopUpdateReq,
 } from '@/types/system'
 
+/** Find cascader value array from region text names */
+function findRegionCodes(province: string, city: string, district: string): string[] {
+  for (const p of regionData) {
+    if (p.label === province) {
+      if (!city) return [p.value]
+      for (const c of p.children ?? []) {
+        if (c.label === city) {
+          if (!district) return [p.value, c.value]
+          for (const d of c.children ?? []) {
+            if (d.label === district) {
+              return [p.value, c.value, d.value]
+            }
+          }
+          return [p.value, c.value]
+        }
+      }
+      return [p.value]
+    }
+  }
+  return []
+}
+
 const loading = ref(false)
 const tableData = ref<ShopResp[]>([])
 const total = ref(0)
@@ -24,19 +47,38 @@ const total = ref(0)
 const searchForm = reactive({
   shop_code: '',
   shop_name: '',
+  province: '',
+  city: '',
+  district: '',
   status: null as number | null,
 })
+
+/** Selected region codes for search cascader */
+const searchRegion = ref<string[]>([])
 
 const pagination = reactive({ page: 1, page_size: 10 })
 
 async function fetchList() {
   loading.value = true
   try {
+    // Convert search region codes to text names
+    if (searchRegion.value.length > 0) {
+      searchForm.province = codeToText[searchRegion.value[0]] ?? ''
+      searchForm.city = searchRegion.value[1] ? (codeToText[searchRegion.value[1]] ?? '') : ''
+      searchForm.district = searchRegion.value[2] ? (codeToText[searchRegion.value[2]] ?? '') : ''
+    } else {
+      searchForm.province = ''
+      searchForm.city = ''
+      searchForm.district = ''
+    }
     const res = await getShopList({
       page: pagination.page,
       page_size: pagination.page_size,
       shop_code: searchForm.shop_code || undefined,
       shop_name: searchForm.shop_name || undefined,
+      province: searchForm.province || undefined,
+      city: searchForm.city || undefined,
+      district: searchForm.district || undefined,
       status: searchForm.status ?? undefined,
     })
     tableData.value = res.data.data.list
@@ -54,7 +96,11 @@ function handleSearch() {
 function handleReset() {
   searchForm.shop_code = ''
   searchForm.shop_name = ''
+  searchForm.province = ''
+  searchForm.city = ''
+  searchForm.district = ''
   searchForm.status = null
+  searchRegion.value = []
   pagination.page = 1
   fetchList()
 }
@@ -77,12 +123,19 @@ const editId = ref<number>(0)
 const submitLoading = ref(false)
 const formRef = ref<FormInstance>()
 
+/** Selected region codes for cascader: [province, city, district] */
+const selectedRegion = ref<string[]>([])
+
 const createForm = reactive<ShopCreateReq>({
   shop_code: '',
   shop_name: '',
   contact: '',
   phone: '',
   email: '',
+  province: '',
+  city: '',
+  district: '',
+  detail_address: '',
   address: '',
   remark: '',
   admin_username: '',
@@ -95,6 +148,10 @@ const editForm = reactive<ShopUpdateReq>({
   contact: '',
   phone: '',
   email: '',
+  province: '',
+  city: '',
+  district: '',
+  detail_address: '',
   address: '',
   remark: '',
 })
@@ -122,12 +179,17 @@ function openCreateDialog() {
   isEdit.value = false
   dialogTitle.value = '新增店铺'
   editId.value = 0
+  selectedRegion.value = []
   Object.assign(createForm, {
     shop_code: '',
     shop_name: '',
     contact: '',
     phone: '',
     email: '',
+    province: '',
+    city: '',
+    district: '',
+    detail_address: '',
     address: '',
     remark: '',
     admin_username: '',
@@ -148,9 +210,14 @@ async function openEditDialog(row: ShopResp) {
     contact: shop.contact,
     phone: shop.phone,
     email: shop.email,
+    province: shop.province,
+    city: shop.city,
+    district: shop.district,
+    detail_address: shop.detail_address,
     address: shop.address,
     remark: shop.remark,
   })
+  selectedRegion.value = findRegionCodes(shop.province, shop.city, shop.district)
   dialogVisible.value = true
 }
 
@@ -160,9 +227,21 @@ async function handleSubmit() {
   submitLoading.value = true
   try {
     if (isEdit.value) {
+      // Populate region names from cascader codes
+      if (selectedRegion.value.length > 0) {
+        editForm.province = codeToText[selectedRegion.value[0]] ?? ''
+        editForm.city = selectedRegion.value[1] ? (codeToText[selectedRegion.value[1]] ?? '') : ''
+        editForm.district = selectedRegion.value[2] ? (codeToText[selectedRegion.value[2]] ?? '') : ''
+      }
       await updateShop(editId.value, editForm)
       ElMessage.success('更新成功')
     } else {
+      // Populate region names from cascader codes
+      if (selectedRegion.value.length > 0) {
+        createForm.province = codeToText[selectedRegion.value[0]] ?? ''
+        createForm.city = selectedRegion.value[1] ? (codeToText[selectedRegion.value[1]] ?? '') : ''
+        createForm.district = selectedRegion.value[2] ? (codeToText[selectedRegion.value[2]] ?? '') : ''
+      }
       await createShop(createForm)
       ElMessage.success('创建成功，店铺管理员账户已自动初始化')
     }
@@ -251,6 +330,16 @@ onMounted(fetchList)
         <el-form-item label="店铺名称">
           <el-input v-model="searchForm.shop_name" placeholder="请输入店铺名称" clearable />
         </el-form-item>
+        <el-form-item label="所在地区">
+          <el-cascader
+            v-model="searchRegion"
+            :options="regionData"
+            :props="{ expandTrigger: 'hover', value: 'value', label: 'label', children: 'children' }"
+            placeholder="省/市/区"
+            clearable
+            style="width: 240px"
+          />
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px">
             <el-option label="启用" :value="1" />
@@ -277,6 +366,11 @@ onMounted(fetchList)
         <el-table-column prop="shop_name" label="店铺名称" min-width="160" />
         <el-table-column prop="contact" label="联系人" min-width="100" />
         <el-table-column prop="phone" label="联系电话" min-width="130" />
+        <el-table-column label="地址" min-width="240">
+          <template #default="{ row }">
+            {{ [row.province, row.city, row.district].filter(Boolean).join(' ') }}{{ row.detail_address ? ' ' + row.detail_address : '' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="admin_username" label="管理员账户" min-width="140" />
         <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
@@ -359,8 +453,18 @@ onMounted(fetchList)
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="createForm.email" placeholder="请输入邮箱" />
         </el-form-item>
-        <el-form-item label="地址">
-          <el-input v-model="createForm.address" placeholder="请输入地址" />
+        <el-form-item label="所在地区" required>
+          <el-cascader
+            v-model="selectedRegion"
+            :options="regionData"
+            :props="{ expandTrigger: 'hover', value: 'value', label: 'label', children: 'children' }"
+            placeholder="请选择省/市/区"
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="详细地址">
+          <el-input v-model="createForm.detail_address" placeholder="请输入街道、门牌号等详细信息" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="createForm.remark" type="textarea" :rows="2" placeholder="可选" />
@@ -398,8 +502,18 @@ onMounted(fetchList)
         <el-form-item label="邮箱" prop="email">
           <el-input v-model="editForm.email" placeholder="请输入邮箱" />
         </el-form-item>
-        <el-form-item label="地址">
-          <el-input v-model="editForm.address" placeholder="请输入地址" />
+        <el-form-item label="所在地区" required>
+          <el-cascader
+            v-model="selectedRegion"
+            :options="regionData"
+            :props="{ expandTrigger: 'hover', value: 'value', label: 'label', children: 'children' }"
+            placeholder="请选择省/市/区"
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="详细地址">
+          <el-input v-model="editForm.detail_address" placeholder="请输入街道、门牌号等详细信息" />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="editForm.remark" type="textarea" :rows="2" placeholder="可选" />

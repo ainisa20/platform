@@ -51,6 +51,9 @@ async function fetchList() {
     })
     tableData.value = res.data.data.list
     total.value = res.data.data.total
+  } catch {
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -99,11 +102,11 @@ const deptMap = computed(() => {
 
 async function loadDropdownData() {
   const [rolesRes, deptsRes] = await Promise.all([
-    getAssignableRoles(),
-    getDeptTree(),
+    getAssignableRoles().catch(() => ({ data: { data: [] } })),
+    getDeptTree().catch(() => ({ data: { data: [] } })),
   ])
-  roleOptions.value = rolesRes.data.data
-  deptTreeData.value = deptsRes.data.data
+  roleOptions.value = rolesRes.data.data || []
+  deptTreeData.value = deptsRes.data.data || []
 }
 
 // ==================== 新增/编辑弹窗 ====================

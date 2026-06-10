@@ -47,6 +47,9 @@ async function fetchList() {
     })
     tableData.value = res.data.data.list
     total.value = res.data.data.total
+  } catch {
+    tableData.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -79,8 +82,12 @@ function handleSizeChange(size: number) {
 const categoryOptions = ref<ProductCategoryResp[]>([])
 
 async function loadCategories() {
-  const res = await getCategoryList({ page: 1, page_size: 100 })
-  categoryOptions.value = res.data.data.list
+  try {
+    const res = await getCategoryList({ page: 1, page_size: 100 })
+    categoryOptions.value = res.data.data.list || []
+  } catch {
+    categoryOptions.value = []
+  }
 }
 
 const dialogVisible = ref(false)

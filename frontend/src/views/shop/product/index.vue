@@ -82,7 +82,7 @@ const selectDialogVisible = ref(false)
 const selectDialogLoading = ref(false)
 const platformProducts = ref<ShopPlatformProductResp[]>([])
 const selectedPlatformIds = ref<Set<number>>(new Set())
-const selectTableRef = ref<InstanceType<typeof ElTable>>()
+const selectTableRef = ref<any>()
 const dialogSearchKeyword = ref('')
 const selectSubmitLoading = ref(false)
 
