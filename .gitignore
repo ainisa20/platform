@@ -62,4 +62,8 @@ secrets/
 .playwright-mcp/
 .playwright-cache/
 debug.log
+*.png
+test.md
+backend/server_new
+frontend/pnpm-lock.yaml
 
