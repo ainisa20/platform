@@ -26,15 +26,32 @@ export const usePermissionStore = defineStore('permission', () => {
   }
 
   function filterRoutes(routes: any[]): any[] {
-    return routes.filter((route) => {
-      if (route.children) {
-        route.children = filterRoutes(route.children)
-      }
-      if (route.meta?.permissionCode) {
-        return permissionCodes.value.includes(route.meta.permissionCode)
-      }
-      return true
-    })
+    return routes
+      .map((route) => {
+        // Deep clone to avoid mutating original route definitions
+        const clone = { ...route }
+        if (clone.children) {
+          clone.children = filterRoutes(clone.children)
+        }
+        return clone
+      })
+      .filter((route) => {
+        if (route.meta?.permissionCode) {
+          return permissionCodes.value.includes(route.meta.permissionCode)
+        }
+        // Parent routes without permissionCode: show only if they have visible children
+        if (route.children && route.children.length > 0) {
+          return true
+        }
+        return true
+      })
+      .filter((route) => {
+        // Hide parent routes whose children were ALL filtered out
+        if (!route.meta?.permissionCode && route.children && route.children.length === 0) {
+          return false
+        }
+        return true
+      })
   }
 
   function resetState() {

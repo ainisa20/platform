@@ -38,7 +38,7 @@ request.interceptors.response.use(
       const loginPath = system === 'shop' ? '/shop/login' : '/platform/login'
       router.push(loginPath)
       ElMessage.error('登录已过期，请重新登录')
-    } else {
+    } else if (error.response?.status !== 403) {
       const message = error.response?.data?.message || error.message || '网络错误'
       ElMessage.error(message)
     }

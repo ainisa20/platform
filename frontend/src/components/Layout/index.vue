@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import { usePermissionStore } from '@/store/permission'
 import { ElMessage } from 'element-plus'
 import {
   Fold,
@@ -28,6 +29,7 @@ const isCollapse = ref(false)
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const permissionStore = usePermissionStore()
 
 const systemTitle = computed(() => {
   return route.path.startsWith('/shop') ? '店铺管理系统' : '平台管理系统'
@@ -36,27 +38,40 @@ const systemTitle = computed(() => {
 const activeMenu = computed(() => route.path)
 
 const menuItems = computed(() => {
-  const currentRoutes = route.path.startsWith('/shop')
-    ? router.getRoutes().filter((r) => r.path.startsWith('/shop/') && r.meta?.title && !r.path.includes('login'))
-    : router.getRoutes().filter((r) => r.path.startsWith('/platform/') && r.meta?.title && !r.path.includes('login'))
+  const codes = permissionStore.permissionCodes
+  const prefix = route.path.startsWith('/shop') ? '/shop/' : '/platform/'
 
-  const topItems = currentRoutes.filter((r) => {
+  const topRoutes = router.getRoutes().filter((r) => {
+    if (!r.path.startsWith(prefix) || !r.meta?.title || r.path.includes('login')) return false
     const parts = r.path.split('/').filter(Boolean)
     return parts.length === 2
   })
 
-  return topItems.map((r) => ({
-    path: r.redirect || r.path,
-    title: r.meta?.title as string,
-    icon: r.meta?.icon as string,
-    children: r.children?.length
-      ? r.children.map((c: any) => ({
+  return topRoutes
+    .map((r) => {
+      const rawChildren = r.children || []
+      const hasSubRoutes = rawChildren.length > 0
+      const visibleChildren = rawChildren
+        .filter((c: any) => !c.meta?.permissionCode || codes.includes(c.meta.permissionCode))
+        .map((c: any) => ({
           path: r.path + '/' + (c.path || ''),
           title: c.meta?.title as string,
           icon: c.meta?.icon as string,
         }))
-      : [],
-  }))
+
+      const permitted = !r.meta?.permissionCode || codes.includes(r.meta.permissionCode as string)
+
+      if (hasSubRoutes && visibleChildren.length === 0) return null
+      if (!permitted) return null
+
+      return {
+        path: r.redirect || r.path,
+        title: r.meta?.title as string,
+        icon: r.meta?.icon as string,
+        children: visibleChildren,
+      }
+    })
+    .filter(Boolean) as Array<{ path: string; title: string; icon: string; children: Array<{ path: string; title: string; icon: string }> }>
 })
 
 async function handleLogout() {

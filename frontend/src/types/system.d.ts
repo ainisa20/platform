@@ -181,6 +181,10 @@ export interface ShopResp {
   contact: string
   phone: string
   email: string
+  province: string
+  city: string
+  district: string
+  detail_address: string
   address: string
   remark: string
   status: number
@@ -196,6 +200,9 @@ export interface ShopResp {
 export interface ShopListReq extends PageReq {
   shop_code?: string
   shop_name?: string
+  province?: string
+  city?: string
+  district?: string
   status?: number | null
 }
 
@@ -205,6 +212,10 @@ export interface ShopCreateReq {
   contact?: string
   phone?: string
   email?: string
+  province?: string
+  city?: string
+  district?: string
+  detail_address?: string
   address?: string
   remark?: string
   admin_username: string
@@ -217,6 +228,10 @@ export interface ShopUpdateReq {
   contact?: string
   phone?: string
   email?: string
+  province?: string
+  city?: string
+  district?: string
+  detail_address?: string
   address?: string
   remark?: string
 }
@@ -489,4 +504,257 @@ export interface ShopCustomerOrderResp {
   status: number
   created_at: string
   created_by: number
+}
+
+export interface OrderItemReq {
+  shop_product_id: number
+  quantity: number
+}
+
+export interface OrderCreateReq {
+  customer_id: number
+  remark?: string
+  items: OrderItemReq[]
+}
+
+export interface OrderListReq extends PageReq {
+  order_no?: string
+  customer_id?: number
+  order_status?: number | null
+}
+
+export interface OrderItemResp {
+  id: number
+  order_group_id: number
+  shop_product_id: number
+  product_name: string
+  quantity: number
+  unit_price: number
+  total_price: number
+  current_node_index: number
+  current_node_name: string
+  next_node_name: string
+  item_status: number
+  created_at: string
+}
+
+export interface OrderResp {
+  id: number
+  order_no: string
+  customer_id: number
+  customer_name: string
+  total_amount: number
+  order_status: number
+  remark: string
+  item_count: number
+  items?: OrderItemResp[]
+  created_at: string
+  created_by: number
+  created_by_name?: string
+  updated_at: string
+}
+
+export interface OrderWorkflowAdvanceReq {
+  notes: string
+}
+
+export interface OrderWorkflowLogResp {
+  id: number
+  order_item_id: number
+  node_index: number
+  node_code: string
+  node_name: string
+  notes: string
+  operator_id: number
+  operator_name: string
+  operated_at: string
+}
+
+export interface OrderAttachmentResp {
+  id: number
+  file_name: string
+  file_size: number
+  file_type: string
+  workflow_log_id?: number
+  created_at: string
+}
+
+export interface OrderWorkflowNodeResp {
+  id: number
+  product_id: number
+  node_index: number
+  node_code: string
+  node_name: string
+}
+
+// ==================== 店铺收支账户 ====================
+
+export interface ShopFinAccountConfig {
+  bank_name?: string
+  branch?: string
+  mch_id?: string
+  appid?: string
+  api_key?: string
+  app_id?: string
+  merchant_id?: string
+  private_key_path?: string
+}
+
+export interface ShopFinAccountResp {
+  id: number
+  account_name: string
+  account_type: number
+  account_no: string
+  initial_balance: number
+  config: ShopFinAccountConfig
+  status: number
+  created_at: string
+  created_by: number
+  created_by_name?: string
+  updated_at: string
+}
+
+export interface ShopFinAccountListReq extends PageReq {
+  account_name?: string
+  account_type?: number | null
+  status?: number | null
+}
+
+export interface ShopFinAccountCreateReq {
+  account_name: string
+  account_type: number
+  account_no?: string
+  initial_balance?: number
+  config?: ShopFinAccountConfig
+  status?: number
+}
+
+export interface ShopFinAccountUpdateReq {
+  account_name: string
+  account_no?: string
+  config?: ShopFinAccountConfig
+  status?: number
+}
+
+// ==================== 店铺收支记录 ====================
+
+export interface FinanceRecordCreateReq {
+  account_id: number
+  category_id: number
+  record_type: number
+  amount: number
+  order_group_id?: number | null
+  record_date: string
+  remark?: string
+}
+
+export interface FinanceRecordUpdateReq {
+  account_id: number
+  category_id: number
+  record_type: number
+  amount: number
+  order_group_id?: number | null
+  record_date: string
+  remark?: string
+}
+
+export interface FinanceRecordListReq extends PageReq {
+  record_no?: string
+  account_id?: number
+  category_id?: number
+  category_l1?: string
+  category_l2?: string
+  category_l3?: string
+  record_type?: number | null
+  review_status?: number | null
+}
+
+export interface FinanceReviewReq {
+  action: 'approve' | 'reject'
+  actual_amount?: number
+  notes?: string
+}
+
+export interface FinanceRecordResp {
+  id: number
+  record_no: string
+  account_id: number
+  account_name: string
+  account_type: number
+  account_initial_balance: number
+  category_id: number
+  category_name: string
+  category_path: string
+  category_l1: string
+  category_l2: string
+  category_l3: string
+  record_type: number
+  amount: number
+  actual_amount: number
+  order_group_id: number | null
+  review_status: number
+  review_by: number
+  review_by_name?: string
+  review_at: string | null
+  review_notes: string
+  record_date: string
+  remark: string
+  created_at: string
+  created_by: number
+  created_by_name?: string
+  updated_at: string
+}
+
+export interface FinanceAttachmentReq {
+  file_name: string
+  file_type?: string
+  file_size?: number
+}
+
+export interface FinanceAttachmentResp {
+  id: number
+  file_name: string
+  file_size: number
+  file_type: string
+  created_at: string
+}
+
+// ==================== 财务报表 ====================
+
+/** 收支汇总 */
+export interface FinanceSummaryResp {
+  total_income: number
+  total_expense: number
+  net_profit: number
+}
+
+/** 收支趋势项 */
+export interface FinanceTrendItem {
+  month: string
+  income: number
+  expense: number
+}
+
+/** 利润表分类项 */
+export interface ProfitLossCategory {
+  name: string
+  type: 'income' | 'expense'
+  subtotal: number
+  children?: ProfitLossCategory[]
+}
+
+// ==================== 平台财务报表 ====================
+
+export interface PlatformFinanceReportReq {
+  shop_id?: number | null
+  start_date?: string
+  end_date?: string
+}
+
+export interface FinanceReportShopSummary {
+  shop_id: number
+  shop_name: string
+  income: number
+  expense: number
+  net_profit: number
 }

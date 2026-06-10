@@ -64,13 +64,19 @@ const platformRoutes: RouteRecordRaw[] = [
         path: 'finance',
         name: 'PlatformFinance',
         meta: { title: '财务管理', icon: 'Money' },
-        redirect: '/platform/finance/category',
+        redirect: '/platform/finance/report',
         children: [
           {
             path: 'category',
             name: 'PlatformFinanceCategory',
             component: () => import('@/views/platform/finance/category/index.vue'),
             meta: { title: '收支分类', icon: 'List', permissionCode: 'platform:finance:category:list' },
+          },
+          {
+            path: 'report',
+            name: 'PlatformFinanceReport',
+            component: () => import('@/views/platform/finance/report/index.vue'),
+            meta: { title: '财务报表', icon: 'DataAnalysis', permissionCode: 'platform:finance:report:list' },
           },
         ],
       },

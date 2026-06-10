@@ -63,7 +63,7 @@ const shopRoutes: RouteRecordRaw[] = [
           {
             path: 'list',
             name: 'ShopOrderList',
-            component: () => import('@/views/shop/placeholder/UserPage.vue'),
+            component: () => import('@/views/shop/order/index.vue'),
             meta: { title: '订单列表', icon: 'List', permissionCode: 'shop:order:list' },
           },
         ],
@@ -72,13 +72,31 @@ const shopRoutes: RouteRecordRaw[] = [
         path: 'finance',
         name: 'ShopFinance',
         meta: { title: '财务管理', icon: 'Money' },
-        redirect: '/shop/finance/category',
+        redirect: '/shop/finance/account',
         children: [
+          {
+            path: 'account',
+            name: 'ShopFinanceAccount',
+            component: () => import('@/views/shop/finance/account/index.vue'),
+            meta: { title: '收支账户', icon: 'Wallet', permissionCode: 'shop:finance:account:list' },
+          },
           {
             path: 'category',
             name: 'ShopFinanceCategory',
             component: () => import('@/views/shop/finance/category/index.vue'),
             meta: { title: '收支分类', icon: 'List', permissionCode: 'shop:finance:category:list' },
+          },
+          {
+            path: 'record',
+            name: 'ShopFinanceRecord',
+            component: () => import('@/views/shop/finance/record/index.vue'),
+            meta: { title: '收支记录', icon: 'Document', permissionCode: 'shop:finance:record:list' },
+          },
+          {
+            path: 'report',
+            name: 'ShopFinanceReport',
+            component: () => import('@/views/shop/finance/report/index.vue'),
+            meta: { title: '财务报表', icon: 'DataAnalysis', permissionCode: 'shop:finance:report:list' },
           },
         ],
       },
