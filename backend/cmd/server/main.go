@@ -28,6 +28,7 @@ import (
 	"platform/internal/service"
 	platformsvc "platform/internal/service/platform"
 	shopsvc "platform/internal/service/shop"
+	"platform/internal/pkg/storage"
 )
 
 func main() {
@@ -54,6 +55,12 @@ func main() {
 
 	authRepo := repository.NewAuthRepository(db)
 
+	minioStorage, err := storage.NewMinIOStorage(cfg.MinIO)
+	if err != nil {
+		log.Fatalf("Failed to connect to MinIO: %v", err)
+	}
+	log.Println("MinIO connected")
+
 	// Platform-side repositories
 	platUserRepo := platformrepo.NewUserRepository()
 	platRoleRepo := platformrepo.NewRoleRepository()
@@ -69,8 +76,11 @@ func main() {
 	shopRoleRepo := shoprepo.NewRoleRepository()
 	shopDeptRepo := shoprepo.NewDeptRepository()
 	shopFinCatRepo := shoprepo.NewShopFinCategoryRepository()
+	shopFinAccountRepo := shoprepo.NewShopFinAccountRepository()
 	shopProductRepo := shoprepo.NewShopProductRepository()
 	shopCustomerRepo := shoprepo.NewShopCustomerRepository()
+	shopOrderRepo := shoprepo.NewOrderRepository()
+	shopRecordRepo := shoprepo.NewRecordRepository()
 
 	// Platform-side services
 	platUserService := platformsvc.NewUserService(platUserRepo, platRoleRepo)
@@ -86,8 +96,11 @@ func main() {
 	shopRoleService := shopsvc.NewRoleService(shopRoleRepo)
 	shopDeptService := shopsvc.NewDeptService(shopDeptRepo, shopUserRepo)
 	shopFinCatService := shopsvc.NewShopFinCategoryService(shopFinCatRepo, platFinCatRepo)
+	shopFinAccountService := shopsvc.NewShopFinAccountService(shopFinAccountRepo, shopUserRepo)
 	shopProductService := shopsvc.NewShopProductService(shopProductRepo, platProductRepo, platCategoryRepo)
 	shopCustomerService := shopsvc.NewShopCustomerService(shopCustomerRepo)
+	shopOrderService := shopsvc.NewOrderService(shopOrderRepo, shopCustomerRepo, shopProductRepo, platProductRepo, platWorkflowRepo, shopUserRepo, minioStorage)
+	shopRecordService := shopsvc.NewRecordService(shopRecordRepo, shopFinAccountRepo, shopFinCatRepo, shopOrderRepo, shopUserRepo, minioStorage)
 
 	// Auth is shared (both endpoints use the same login service)
 	authService := service.NewAuthService(authRepo, rdb, cfg)
@@ -100,6 +113,7 @@ func main() {
 	platformCategoryCtrl := platform.NewProductCategoryCtrl(platCategoryService)
 	platformProductCtrl := platform.NewProductCtrl(platProductService)
 	platformFinCatCtrl := platform.NewFinanceCategoryCtrl(platFinCatService)
+	platformFinReportCtrl := platform.NewFinanceReportCtrl(platformsvc.NewFinanceReportService())
 	platformAuthCtrl := platform.NewAuthController(authService)
 
 	shopUserCtrl := shop.NewSysUserCtrl(shopUserService)
@@ -108,8 +122,12 @@ func main() {
 	shopPermCtrl := shop.NewSysPermissionCtrl(shopRoleService)
 	shopAuthCtrl := shop.NewAuthController(authService)
 	shopFinCatCtrl := shop.NewShopFinCategoryCtrl(shopFinCatService)
+	shopFinAccountCtrl := shop.NewShopFinAccountCtrl(shopFinAccountService)
 	shopProductCtrl := shop.NewShopProductCtrl(shopProductService)
 	shopCustomerCtrl := shop.NewShopCustomerCtrl(shopCustomerService)
+	shopOrderCtrl := shop.NewOrderCtrl(shopOrderService)
+	shopRecordCtrl := shop.NewRecordCtrl(shopRecordService)
+	shopReportCtrl := shop.NewFinanceReportCtrl()
 
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -132,6 +150,7 @@ func main() {
 		platformUserCtrl, platformRoleCtrl, platformDeptCtrl, platformPermCtrl, platformShopCtrl,
 		platformCategoryCtrl, platformProductCtrl,
 		platformFinCatCtrl,
+		platformFinReportCtrl,
 	)
 
 	router.RegisterShopRoutes(
@@ -141,6 +160,10 @@ func main() {
 		shopFinCatCtrl,
 		shopProductCtrl,
 		shopCustomerCtrl,
+		shopOrderCtrl,
+		shopFinAccountCtrl,
+		shopRecordCtrl,
+		shopReportCtrl,
 	)
 
 	startServer(r, cfg)
@@ -199,8 +222,15 @@ func autoMigrate(db *gorm.DB) error {
 		&entity.ProductWorkflowNode{},
 		&entity.FinanceCategory{},
 		&entity.ShopFinanceCategory{},
+		&entity.ShopFinanceAccount{},
 		&entity.ShopProduct{},
 		&entity.ShopCustomer{},
+		&entity.OrderGroup{},
+		&entity.OrderItem{},
+		&entity.OrderWorkflowLog{},
+		&entity.OrderAttachment{},
+		&entity.FinanceRecord{},
+		&entity.FinanceAttachment{},
 	)
 }
 

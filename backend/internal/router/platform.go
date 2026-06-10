@@ -25,6 +25,7 @@ func RegisterPlatformRoutes(
 	categoryCtrl *platform.ProductCategoryCtrl,
 	productCtrl *platform.ProductCtrl,
 	financeCategoryCtrl *platform.FinanceCategoryCtrl,
+	reportCtrl *platform.FinanceReportCtrl,
 ) {
 	v1 := r.Group("/api/v1/platform")
 	v1.Use(
@@ -139,5 +140,17 @@ func RegisterPlatformRoutes(
 		financeCategories.POST("", middleware.PermissionMiddleware("platform:finance:category:create"), financeCategoryCtrl.Create)
 		financeCategories.PUT("/:id", middleware.PermissionMiddleware("platform:finance:category:update"), financeCategoryCtrl.Update)
 		financeCategories.DELETE("/:id", middleware.PermissionMiddleware("platform:finance:category:delete"), financeCategoryCtrl.Delete)
+	}
+
+	financeReports := v1.Group("/finance/reports")
+	financeReports.Use(
+		middleware.JWTAuthMiddleware(jwtSecret, "platform"),
+		middleware.DBInjectMiddleware(db),
+	)
+	{
+		financeReports.GET("/summary", middleware.PermissionMiddleware("platform:finance:report:list"), reportCtrl.Summary)
+		financeReports.GET("/trend", middleware.PermissionMiddleware("platform:finance:report:list"), reportCtrl.Trend)
+		financeReports.GET("/profit-loss", middleware.PermissionMiddleware("platform:finance:report:list"), reportCtrl.ProfitLoss)
+		financeReports.GET("/shops", middleware.PermissionMiddleware("platform:finance:report:list"), reportCtrl.PerShop)
 	}
 }

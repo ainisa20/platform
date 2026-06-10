@@ -1,6 +1,10 @@
 package dto
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
 
 // ========== Common ==========
 
@@ -79,6 +83,10 @@ type ShopCreateReq struct {
 	Contact       string `json:"contact"`
 	Phone         string `json:"phone"`
 	Email         string `json:"email" binding:"omitempty,email"`
+	Province      string `json:"province"`
+	City          string `json:"city"`
+	District      string `json:"district"`
+	DetailAddress string `json:"detail_address"`
 	Address       string `json:"address"`
 	Remark        string `json:"remark"`
 	AdminUsername string `json:"admin_username" binding:"required,min=3"`
@@ -88,12 +96,16 @@ type ShopCreateReq struct {
 
 // ShopUpdateReq update shop request.
 type ShopUpdateReq struct {
-	ShopName string `json:"shop_name" binding:"required"`
-	Contact  string `json:"contact"`
-	Phone    string `json:"phone"`
-	Email    string `json:"email" binding:"omitempty,email"`
-	Address  string `json:"address"`
-	Remark   string `json:"remark"`
+	ShopName      string `json:"shop_name" binding:"required"`
+	Contact       string `json:"contact"`
+	Phone         string `json:"phone"`
+	Email         string `json:"email" binding:"omitempty,email"`
+	Province      string `json:"province"`
+	City          string `json:"city"`
+	District      string `json:"district"`
+	DetailAddress string `json:"detail_address"`
+	Address       string `json:"address"`
+	Remark        string `json:"remark"`
 }
 
 // ShopStatusReq enable/disable shop.
@@ -107,27 +119,34 @@ type ShopListReq struct {
 	PageSize int    `form:"page_size"`
 	ShopCode string `form:"shop_code"`
 	ShopName string `form:"shop_name"`
+	Province string `form:"province"`
+	City     string `form:"city"`
+	District string `form:"district"`
 	Status   *int16 `form:"status"`
 }
 
 // ShopResp shop response.
 type ShopResp struct {
-	ID           uint64     `json:"id"`
-	ShopCode     string     `json:"shop_code"`
-	ShopName     string     `json:"shop_name"`
-	Contact      string     `json:"contact"`
-	Phone        string     `json:"phone"`
-	Email        string     `json:"email"`
-	Address      string     `json:"address"`
-	Remark       string     `json:"remark"`
-	Status       int16      `json:"status"`
-	AdminUserID  *uint64    `json:"admin_user_id"`
-	AdminUsername string    `json:"admin_username"`
-	ExpiresAt    *time.Time `json:"expires_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	CreatedBy    uint64     `json:"created_by"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	UpdatedBy    uint64     `json:"updated_by"`
+	ID            uint64     `json:"id"`
+	ShopCode      string     `json:"shop_code"`
+	ShopName      string     `json:"shop_name"`
+	Contact       string     `json:"contact"`
+	Phone         string     `json:"phone"`
+	Email         string     `json:"email"`
+	Province      string     `json:"province"`
+	City          string     `json:"city"`
+	District      string     `json:"district"`
+	DetailAddress string     `json:"detail_address"`
+	Address       string     `json:"address"`
+	Remark        string     `json:"remark"`
+	Status        int16      `json:"status"`
+	AdminUserID   *uint64    `json:"admin_user_id"`
+	AdminUsername  string    `json:"admin_username"`
+	ExpiresAt     *time.Time `json:"expires_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	CreatedBy     uint64     `json:"created_by"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	UpdatedBy     uint64     `json:"updated_by"`
 }
 
 // ========== Role ==========
@@ -529,4 +548,250 @@ type ShopCustomerOrderResp struct {
 	Status      int16     `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	CreatedBy   uint64    `json:"created_by"`
+}
+
+// ========== Shop Order ==========
+
+type OrderItemReq struct {
+	ShopProductID uint64 `json:"shop_product_id" binding:"required"`
+	Quantity      int16  `json:"quantity" binding:"required,min=1"`
+}
+
+type OrderCreateReq struct {
+	CustomerID uint64         `json:"customer_id" binding:"required"`
+	Remark     string         `json:"remark"`
+	Items      []OrderItemReq `json:"items" binding:"required,min=1,dive"`
+}
+
+type OrderListReq struct {
+	Page        int     `form:"page"`
+	PageSize    int     `form:"page_size"`
+	OrderNo     string  `form:"order_no"`
+	CustomerID  *uint64 `form:"customer_id"`
+	OrderStatus *int16  `form:"order_status"`
+}
+
+type OrderItemResp struct {
+	ID               uint64    `json:"id"`
+	OrderGroupID     uint64    `json:"order_group_id"`
+	ShopProductID    uint64    `json:"shop_product_id"`
+	ProductName      string    `json:"product_name"`
+	Quantity         int16     `json:"quantity"`
+	UnitPrice        float64   `json:"unit_price"`
+	TotalPrice       float64   `json:"total_price"`
+	CurrentNodeIndex int16     `json:"current_node_index"`
+	CurrentNodeName  string    `json:"current_node_name"`
+	NextNodeName     string    `json:"next_node_name"`
+	ItemStatus       int16     `json:"item_status"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type OrderResp struct {
+	ID            uint64          `json:"id"`
+	OrderNo       string          `json:"order_no"`
+	CustomerID    uint64          `json:"customer_id"`
+	CustomerName  string          `json:"customer_name"`
+	TotalAmount   float64         `json:"total_amount"`
+	OrderStatus   int16           `json:"order_status"`
+	Remark        string          `json:"remark"`
+	ItemCount     int             `json:"item_count"`
+	Items         []OrderItemResp `json:"items,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
+	CreatedBy     uint64          `json:"created_by"`
+	CreatedByName string          `json:"created_by_name"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+}
+
+type OrderWorkflowAdvanceReq struct {
+	Notes string `json:"notes"`
+}
+
+type OrderWorkflowLogResp struct {
+	ID           uint64    `json:"id"`
+	OrderItemID  uint64    `json:"order_item_id"`
+	NodeIndex    int16     `json:"node_index"`
+	NodeCode     string    `json:"node_code"`
+	NodeName     string    `json:"node_name"`
+	Notes        string    `json:"notes"`
+	OperatorID   uint64    `json:"operator_id"`
+	OperatorName string    `json:"operator_name"`
+	OperatedAt   time.Time `json:"operated_at"`
+}
+
+type OrderAttachmentResp struct {
+	ID            uint64    `json:"id"`
+	FileName      string    `json:"file_name"`
+	FileSize      int64     `json:"file_size"`
+	FileType      string    `json:"file_type"`
+	WorkflowLogID *uint64   `json:"workflow_log_id"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// ========== Shop Finance Account ==========
+
+type ShopFinAccountCreateReq struct {
+	AccountName    string         `json:"account_name" binding:"required"`
+	AccountType    int16          `json:"account_type" binding:"required,oneof=1 2 3"`
+	AccountNo      string         `json:"account_no"`
+	InitialBalance float64        `json:"initial_balance"`
+	Config         datatypes.JSON `json:"config"`
+	Status         int16          `json:"status"`
+}
+
+type ShopFinAccountUpdateReq struct {
+	AccountName string         `json:"account_name" binding:"required"`
+	AccountNo   string         `json:"account_no"`
+	Config      datatypes.JSON `json:"config"`
+	Status      int16          `json:"status"`
+}
+
+type ShopFinAccountListReq struct {
+	Page        int    `form:"page"`
+	PageSize    int    `form:"page_size"`
+	AccountName string `form:"account_name"`
+	AccountType *int16 `form:"account_type"`
+	Status      *int16 `form:"status"`
+}
+
+type ShopFinAccountResp struct {
+	ID             uint64         `json:"id"`
+	AccountName    string         `json:"account_name"`
+	AccountType    int16          `json:"account_type"`
+	AccountNo      string         `json:"account_no"`
+	InitialBalance float64        `json:"initial_balance"`
+	Config         datatypes.JSON `json:"config"`
+	Status         int16          `json:"status"`
+	CreatedAt      time.Time      `json:"created_at"`
+	CreatedBy      uint64         `json:"created_by"`
+	CreatedByName  string         `json:"created_by_name"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+}
+
+type FinanceRecordCreateReq struct {
+	AccountID    uint64  `json:"account_id" binding:"required"`
+	CategoryID   uint64  `json:"category_id" binding:"required"`
+	RecordType   int16   `json:"record_type" binding:"required,oneof=1 2"`
+	Amount       float64 `json:"amount" binding:"required,gt=0"`
+	OrderGroupID *uint64 `json:"order_group_id"`
+	RecordDate   string  `json:"record_date" binding:"required"`
+	Remark       string  `json:"remark"`
+}
+
+type FinanceRecordUpdateReq struct {
+	AccountID    uint64  `json:"account_id" binding:"required"`
+	CategoryID   uint64  `json:"category_id" binding:"required"`
+	RecordType   int16   `json:"record_type" binding:"required,oneof=1 2"`
+	Amount       float64 `json:"amount" binding:"required,gt=0"`
+	OrderGroupID *uint64 `json:"order_group_id"`
+	RecordDate   string  `json:"record_date" binding:"required"`
+	Remark       string  `json:"remark"`
+}
+
+type FinanceRecordListReq struct {
+	Page         int     `form:"page"`
+	PageSize     int     `form:"page_size"`
+	RecordNo     string  `form:"record_no"`
+	AccountID    *uint64 `form:"account_id"`
+	CategoryID   *uint64 `form:"category_id"`
+	CategoryL1   *string `form:"category_l1"`
+	CategoryL2   *string `form:"category_l2"`
+	CategoryL3   *string `form:"category_l3"`
+	RecordType   *int16  `form:"record_type"`
+	ReviewStatus *int16  `form:"review_status"`
+}
+
+type FinanceReviewReq struct {
+	Action       string   `json:"action" binding:"required,oneof=approve reject"`
+	ActualAmount *float64 `json:"actual_amount"`
+	Notes        string   `json:"notes"`
+}
+
+type FinanceRecordResp struct {
+	ID                    uint64     `json:"id"`
+	RecordNo              string     `json:"record_no"`
+	AccountID             uint64     `json:"account_id"`
+	AccountName           string     `json:"account_name"`
+	AccountType           int16      `json:"account_type"`
+	AccountInitialBalance float64    `json:"account_initial_balance"`
+	CategoryID            uint64     `json:"category_id"`
+	CategoryName          string     `json:"category_name"`
+	CategoryPath          string     `json:"category_path"`
+	CategoryL1            string     `json:"category_l1"`
+	CategoryL2            string     `json:"category_l2"`
+	CategoryL3            string     `json:"category_l3"`
+	RecordType            int16      `json:"record_type"`
+	Amount                float64    `json:"amount"`
+	ActualAmount          float64    `json:"actual_amount"`
+	OrderGroupID          *uint64    `json:"order_group_id"`
+	ReviewStatus          int16      `json:"review_status"`
+	ReviewBy              uint64     `json:"review_by"`
+	ReviewByName          string     `json:"review_by_name"`
+	ReviewAt              *time.Time `json:"review_at"`
+	ReviewNotes           string     `json:"review_notes"`
+	RecordDate            string     `json:"record_date"`
+	Remark                string     `json:"remark"`
+	CreatedAt             time.Time  `json:"created_at"`
+	CreatedBy             uint64     `json:"created_by"`
+	CreatedByName         string     `json:"created_by_name"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+}
+
+type FinanceAttachmentReq struct {
+	FileName string `json:"file_name" binding:"required"`
+	FileType string `json:"file_type"`
+	FileSize int64  `json:"file_size"`
+}
+
+type FinanceAttachmentResp struct {
+	ID        uint64    `json:"id"`
+	FileName  string    `json:"file_name"`
+	FileSize  int64     `json:"file_size"`
+	FileType  string    `json:"file_type"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ==================== Finance Report ====================
+
+type FinanceReportReq struct {
+	StartDate string `form:"start_date"`
+	EndDate   string `form:"end_date"`
+}
+
+type FinanceSummaryResp struct {
+	TotalIncome  float64 `json:"total_income"`
+	TotalExpense float64 `json:"total_expense"`
+	NetProfit    float64 `json:"net_profit"`
+}
+
+type FinanceTrendItem struct {
+	Month   string  `json:"month"`
+	Income  float64 `json:"income"`
+	Expense float64 `json:"expense"`
+}
+
+type ProfitLossCategory struct {
+	Name     string               `json:"name"`
+	Type     string               `json:"type"`
+	Subtotal float64              `json:"subtotal"`
+	Children []*ProfitLossCategory `json:"children,omitempty" gorm:"-"`
+}
+
+type FinanceProfitLossResp struct {
+	Categories []*ProfitLossCategory `json:"categories"`
+}
+
+// ==================== Platform Finance Report ====================
+
+type PlatformFinanceReportReq struct {
+	ShopID    *uint64 `form:"shop_id"`
+	StartDate string  `form:"start_date"`
+	EndDate   string  `form:"end_date"`
+}
+
+type FinanceReportShopSummary struct {
+	ShopID     uint64  `json:"shop_id"`
+	ShopName   string  `json:"shop_name"`
+	Income     float64 `json:"income"`
+	Expense    float64 `json:"expense"`
+	NetProfit  float64 `json:"net_profit"`
 }

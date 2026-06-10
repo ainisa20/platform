@@ -24,6 +24,10 @@ func RegisterShopRoutes(
 	finCatCtrl *shop.ShopFinCategoryCtrl,
 	shopProductCtrl *shop.ShopProductCtrl,
 	customerCtrl *shop.ShopCustomerCtrl,
+	orderCtrl *shop.OrderCtrl,
+	finAccountCtrl *shop.ShopFinAccountCtrl,
+	recordCtrl *shop.RecordCtrl,
+	reportCtrl *shop.FinanceReportCtrl,
 ) {
 	v1 := r.Group("/api/v1/shop")
 	v1.Use(
@@ -97,6 +101,41 @@ func RegisterShopRoutes(
 		finance.GET("/categories", middleware.PermissionMiddleware("shop:finance:category:list"), finCatCtrl.List)
 		finance.POST("/categories/sync", middleware.PermissionMiddleware("shop:finance:category:sync"), finCatCtrl.Sync)
 		finance.DELETE("/categories/:id", middleware.PermissionMiddleware("shop:finance:category:delete"), finCatCtrl.CancelSync)
+
+		accounts := finance.Group("/accounts")
+		{
+			accounts.GET("", middleware.PermissionMiddleware("shop:finance:account:list"), finAccountCtrl.List)
+			accounts.POST("", middleware.PermissionMiddleware("shop:finance:account:create"), finAccountCtrl.Create)
+			accounts.PUT("/:id", middleware.PermissionMiddleware("shop:finance:account:update"), finAccountCtrl.Update)
+			accounts.DELETE("/:id", middleware.PermissionMiddleware("shop:finance:account:delete"), finAccountCtrl.Delete)
+		}
+
+		reports := finance.Group("/reports")
+		{
+			reports.GET("/summary", middleware.PermissionMiddleware("shop:finance:report:list"), reportCtrl.Summary)
+			reports.GET("/trend", middleware.PermissionMiddleware("shop:finance:report:list"), reportCtrl.Trend)
+			reports.GET("/profit-loss", middleware.PermissionMiddleware("shop:finance:report:list"), reportCtrl.ProfitLoss)
+		}
+	}
+
+	records := v1.Group("/finance/records")
+	records.Use(
+		middleware.JWTAuthMiddleware(jwtSecret, "shop"),
+		middleware.DBInjectMiddleware(db),
+		middleware.TenantRLSMiddleware(db),
+		middleware.DataScopeMiddleware(db),
+	)
+	{
+		records.GET("/export", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.Export)
+		records.GET("", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.List)
+		records.GET("/:id", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.Get)
+		records.GET("/:id/attachments", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.ListAttachments)
+		records.POST("", middleware.PermissionMiddleware("shop:finance:record:create"), recordCtrl.Create)
+		records.POST("/:id/review", middleware.PermissionMiddleware("shop:finance:record:audit"), recordCtrl.Review)
+		records.POST("/:id/attachments", middleware.PermissionMiddleware("shop:finance:record:upload"), recordCtrl.CreateAttachment)
+		records.GET("/:id/attachments/:attId/download", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.DownloadAttachment)
+		records.PUT("/:id", middleware.PermissionMiddleware("shop:finance:record:update"), recordCtrl.Update)
+		records.DELETE("/:id", middleware.PermissionMiddleware("shop:finance:record:delete"), recordCtrl.Delete)
 	}
 
 	products := v1.Group("/products")
@@ -129,5 +168,27 @@ func RegisterShopRoutes(
 		customers.POST("", middleware.PermissionMiddleware("shop:customer:create"), customerCtrl.Create)
 		customers.PUT("/:id", middleware.PermissionMiddleware("shop:customer:update"), customerCtrl.Update)
 		customers.DELETE("/:id", middleware.PermissionMiddleware("shop:customer:delete"), customerCtrl.Delete)
+	}
+
+	orders := v1.Group("/orders")
+	orders.Use(
+		middleware.JWTAuthMiddleware(jwtSecret, "shop"),
+		middleware.DBInjectMiddleware(db),
+		middleware.TenantRLSMiddleware(db),
+		middleware.DataScopeMiddleware(db),
+	)
+	{
+		orders.GET("", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.List)
+		orders.GET("/export", middleware.PermissionMiddleware("shop:order:export"), orderCtrl.Export)
+		orders.GET("/:id", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.Get)
+		orders.POST("", middleware.PermissionMiddleware("shop:order:create"), orderCtrl.Create)
+		orders.PUT("/:id/cancel", middleware.PermissionMiddleware("shop:order:cancel"), orderCtrl.CancelGroup)
+		orders.PUT("/:id/items/:itemId/cancel", middleware.PermissionMiddleware("shop:order:cancel"), orderCtrl.CancelItem)
+		orders.GET("/:id/items/:itemId/workflow", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.GetItemWorkflow)
+		orders.GET("/:id/items/:itemId/workflow/logs", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.GetItemWorkflowLogs)
+		orders.POST("/:id/items/:itemId/workflow/advance", middleware.PermissionMiddleware("shop:order:advance"), orderCtrl.AdvanceItemWorkflow)
+		orders.GET("/:id/items/:itemId/attachments", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.ListItemAttachments)
+		orders.POST("/:id/items/:itemId/attachments", middleware.PermissionMiddleware("shop:order:upload"), orderCtrl.CreateItemAttachment)
+		orders.GET("/:id/items/:itemId/attachments/:attId", middleware.PermissionMiddleware("shop:order:list"), orderCtrl.GetItemAttachment)
 	}
 }
