@@ -24,6 +24,9 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => {
+    if (response.config.responseType === 'blob') {
+      return response
+    }
     const res = response.data as ApiResponse
     if (res.code !== 0 && res.code !== 200) {
       ElMessage.error(res.message || '请求失败')
