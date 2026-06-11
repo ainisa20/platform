@@ -129,24 +129,10 @@ watch(() => formData.account_type, (newVal, oldVal) => {
   }
 })
 
-function buildConfigByType(type: number): ShopFinAccountConfig {
-  if (type === 1) {
-    return {
-      bank_name: configForm.bank_name || undefined,
-      branch: configForm.branch || undefined,
-    }
-  }
-  if (type === 2) {
-    return {
-      mch_id: configForm.mch_id || undefined,
-      appid: configForm.appid || undefined,
-      api_key: configForm.api_key || undefined,
-    }
-  }
+function buildConfigByType(_type: number): ShopFinAccountConfig {
   return {
-    app_id: configForm.app_id || undefined,
-    merchant_id: configForm.merchant_id || undefined,
-    private_key_path: configForm.private_key_path || undefined,
+    bank_name: configForm.bank_name || undefined,
+    branch: configForm.branch || undefined,
   }
 }
 
@@ -237,8 +223,7 @@ const accountTypeTagType = (t: number) => {
 }
 const accountTypeText = (t: number) => {
   if (t === 1) return '对公'
-  if (t === 2) return '微信'
-  return '支付宝'
+  return '对私'
 }
 const statusTagType = (s: number) => (s === 1 ? 'success' : 'info')
 const statusText = (s: number) => (s === 1 ? '启用' : '停用')
@@ -256,8 +241,7 @@ onMounted(fetchList)
         <el-form-item label="账户类型">
           <el-select v-model="searchForm.account_type" placeholder="全部类型" clearable style="width: 140px">
             <el-option label="对公" :value="1" />
-            <el-option label="微信" :value="2" />
-            <el-option label="支付宝" :value="3" />
+            <el-option label="对私" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -298,6 +282,11 @@ onMounted(fetchList)
         <el-table-column label="初始余额" width="130" align="right">
           <template #default="{ row }">
             {{ formatAmount(row.initial_balance) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="账户余额" width="130" align="right">
+          <template #default="{ row }">
+            <span :style="{ color: row.balance < 0 ? '#F56C6C' : '#303133' }">{{ formatAmount(row.balance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80" align="center">
@@ -352,8 +341,7 @@ onMounted(fetchList)
         <el-form-item v-if="!isEdit" label="账户类型" prop="account_type">
           <el-radio-group v-model="formData.account_type">
             <el-radio :value="1">对公</el-radio>
-            <el-radio :value="2">微信</el-radio>
-            <el-radio :value="3">支付宝</el-radio>
+            <el-radio :value="2">对私</el-radio>
           </el-radio-group>
         </el-form-item>
 
@@ -375,26 +363,12 @@ onMounted(fetchList)
               <el-input v-model="configForm.branch" placeholder="请输入支行" />
             </el-form-item>
           </template>
-          <template v-else-if="formData.account_type === 2">
-            <el-form-item label="商户号">
-              <el-input v-model="configForm.mch_id" placeholder="请输入商户号" />
-            </el-form-item>
-            <el-form-item label="AppID">
-              <el-input v-model="configForm.appid" placeholder="请输入 AppID" />
-            </el-form-item>
-            <el-form-item label="API Key">
-              <el-input v-model="configForm.api_key" placeholder="请输入 API Key" show-password />
-            </el-form-item>
-          </template>
           <template v-else>
-            <el-form-item label="AppID">
-              <el-input v-model="configForm.app_id" placeholder="请输入 AppID" />
+            <el-form-item label="开户行">
+              <el-input v-model="configForm.bank_name" placeholder="请输入开户行" />
             </el-form-item>
-            <el-form-item label="商户号">
-              <el-input v-model="configForm.merchant_id" placeholder="请输入商户号" />
-            </el-form-item>
-            <el-form-item label="私钥路径">
-              <el-input v-model="configForm.private_key_path" placeholder="请输入私钥文件路径" />
+            <el-form-item label="支行">
+              <el-input v-model="configForm.branch" placeholder="请输入支行" />
             </el-form-item>
           </template>
         </div>

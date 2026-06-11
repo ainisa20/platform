@@ -55,10 +55,13 @@ func (s *ShopFinAccountService) List(db *gorm.DB, tenantID uint64, req *dto.Shop
 
 	nameMap := s.fetchUserNames(db, collectFinAccountCreatedBy(accounts))
 
+	balanceMap := s.calculateBalances(db, collectAccountIDs(accounts))
+
 	list := make([]dto.ShopFinAccountResp, 0, len(accounts))
 	for i := range accounts {
 		resp := accountToResp(&accounts[i])
 		resp.CreatedByName = nameMap[accounts[i].CreatedBy]
+		resp.Balance = balanceMap[accounts[i].ID]
 		list = append(list, resp)
 	}
 	return list, total, nil
@@ -73,6 +76,8 @@ func (s *ShopFinAccountService) Get(db *gorm.DB, id, tenantID uint64) (*dto.Shop
 		return nil, err
 	}
 	resp := accountToResp(&a)
+	balanceMap := s.calculateBalances(db, []uint64{a.ID})
+	resp.Balance = balanceMap[a.ID]
 	if a.CreatedBy != 0 {
 		nameMap := s.fetchUserNames(db, []uint64{a.CreatedBy})
 		resp.CreatedByName = nameMap[a.CreatedBy]
@@ -201,6 +206,47 @@ func collectFinAccountCreatedBy(accounts []entity.ShopFinanceAccount) []uint64 {
 		ids = append(ids, a.CreatedBy)
 	}
 	return ids
+}
+
+func collectAccountIDs(accounts []entity.ShopFinanceAccount) []uint64 {
+	ids := make([]uint64, len(accounts))
+	for i, a := range accounts {
+		ids[i] = a.ID
+	}
+	return ids
+}
+
+func (s *ShopFinAccountService) calculateBalances(db *gorm.DB, accountIDs []uint64) map[uint64]float64 {
+	result := make(map[uint64]float64, len(accountIDs))
+	if len(accountIDs) == 0 {
+		return result
+	}
+
+	type balanceRow struct {
+		AccountID uint64
+		Income    float64
+		Expense   float64
+	}
+	var rows []balanceRow
+	db.Table("finance_record").
+		Select("account_id, COALESCE(SUM(CASE WHEN record_type = 1 THEN actual_amount ELSE 0 END), 0) as income, COALESCE(SUM(CASE WHEN record_type = 2 THEN actual_amount ELSE 0 END), 0) as expense").
+		Where("account_id IN ? AND review_status = 2 AND deleted_at IS NULL", accountIDs).
+		Group("account_id").
+		Scan(&rows)
+
+	incomeExpense := make(map[uint64]struct{ income, expense float64 }, len(rows))
+	for _, r := range rows {
+		incomeExpense[r.AccountID] = struct{ income, expense float64 }{r.Income, r.Expense}
+	}
+
+	var accounts []entity.ShopFinanceAccount
+	db.Where("id IN ?", accountIDs).Select("id, initial_balance").Find(&accounts)
+
+	for _, a := range accounts {
+		ie := incomeExpense[a.ID]
+		result[a.ID] = a.InitialBalance + ie.income - ie.expense
+	}
+	return result
 }
 
 func accountToResp(a *entity.ShopFinanceAccount) dto.ShopFinAccountResp {
