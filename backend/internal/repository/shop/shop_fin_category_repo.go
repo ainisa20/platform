@@ -69,7 +69,7 @@ func (r *shopFinCategoryRepository) HasReference(db *gorm.DB, id uint64) (bool, 
 		return false, nil
 	}
 	var count int64
-	if err := db.Table("finance_record").Where("category_id = ?", id).Count(&count).Error; err != nil {
+	if err := db.Table("finance_record").Where("category_id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
 		return false, nil
 	}
 	return count > 0, nil
@@ -77,7 +77,7 @@ func (r *shopFinCategoryRepository) HasReference(db *gorm.DB, id uint64) (bool, 
 
 func (r *shopFinCategoryRepository) HasChildren(db *gorm.DB, id uint64) (bool, error) {
 	var count int64
-	if err := db.Model(&entity.ShopFinanceCategory{}).Where("parent_id = ?", id).Count(&count).Error; err != nil {
+	if err := db.Model(&entity.ShopFinanceCategory{}).Where("parent_id = ? AND deleted_at IS NULL", id).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
