@@ -12,19 +12,6 @@ import (
 	"platform/internal/service/shared"
 )
 
-var defaultWorkflowNodes = []struct {
-	NodeIndex int16
-	NodeCode  string
-	NodeName  string
-}{
-	{1, "contact", "联系客户"},
-	{2, "order", "下单"},
-	{3, "account", "创建账号"},
-	{4, "deploy", "部署"},
-	{5, "implement", "实施"},
-	{6, "complete", "完成"},
-}
-
 type ProductService struct {
 	productRepo  platform.ProductRepository
 	workflowRepo platform.WorkflowRepository
@@ -93,29 +80,23 @@ func (s *ProductService) Create(db *gorm.DB, createdBy uint64, req *dto.ProductC
 		UpdatedBy:       createdBy,
 	}
 
-	err := db.Transaction(func(tx *gorm.DB) error {
-		if err := s.productRepo.Create(tx, product); err != nil {
-			return fmt.Errorf("create product: %w", err)
-		}
+	if err := s.productRepo.Create(db, product); err != nil {
+		return nil, fmt.Errorf("create product: %w", err)
+	}
 
-		nodes := make([]entity.ProductWorkflowNode, len(defaultWorkflowNodes))
-		for i, dn := range defaultWorkflowNodes {
-			nodes[i] = entity.ProductWorkflowNode{
-				ProductID: product.ID,
-				NodeIndex: dn.NodeIndex,
-				NodeCode:  dn.NodeCode,
-				NodeName:  dn.NodeName,
-				CreatedBy: createdBy,
-				UpdatedBy: createdBy,
-			}
+	nodes := make([]entity.ProductWorkflowNode, len(req.WorkflowNodes))
+	for i, n := range req.WorkflowNodes {
+		nodes[i] = entity.ProductWorkflowNode{
+			ProductID: product.ID,
+			NodeIndex: n.NodeIndex,
+			NodeCode:  n.NodeCode,
+			NodeName:  n.NodeName,
+			CreatedBy: createdBy,
+			UpdatedBy: createdBy,
 		}
-		if err := s.workflowRepo.BatchCreate(tx, nodes); err != nil {
-			return fmt.Errorf("create default workflow: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
+	}
+	if err := s.workflowRepo.BatchCreate(db, nodes); err != nil {
+		return nil, fmt.Errorf("create workflow nodes: %w", err)
 	}
 
 	return s.GetByID(db, product.ID)
