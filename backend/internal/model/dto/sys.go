@@ -298,14 +298,15 @@ type CategoryResp struct {
 // ========== Product ==========
 
 type ProductCreateReq struct {
-	ProductCode     string  `json:"product_code" binding:"required"`
-	ProductName     string  `json:"product_name" binding:"required"`
-	CategoryID      *uint64 `json:"category_id" binding:"required"`
-	Price           float64 `json:"price" binding:"required"`
-	Sort            int16   `json:"sort"`
-	Status          int16   `json:"status"`
-	MallProductCode string  `json:"mall_product_code"`
-	Description     string  `json:"description"`
+	ProductCode     string           `json:"product_code" binding:"required"`
+	ProductName     string           `json:"product_name" binding:"required"`
+	CategoryID      *uint64          `json:"category_id" binding:"required"`
+	Price           float64          `json:"price" binding:"required"`
+	Sort            int16            `json:"sort"`
+	Status          int16            `json:"status"`
+	MallProductCode string           `json:"mall_product_code"`
+	Description     string           `json:"description"`
+	WorkflowNodes   []WorkflowNodeReq `json:"workflow_nodes" binding:"required,dive"`
 }
 
 type ProductUpdateReq struct {
@@ -564,11 +565,12 @@ type OrderCreateReq struct {
 }
 
 type OrderListReq struct {
-	Page        int     `form:"page"`
-	PageSize    int     `form:"page_size"`
-	OrderNo     string  `form:"order_no"`
-	CustomerID  *uint64 `form:"customer_id"`
-	OrderStatus *int16  `form:"order_status"`
+	Page             int     `form:"page"`
+	PageSize         int     `form:"page_size"`
+	OrderNo          string  `form:"order_no"`
+	CustomerID       *uint64 `form:"customer_id"`
+	OrderStatus      *int16  `form:"order_status"`
+	ExcludeCancelled bool    `form:"exclude_cancelled"`
 }
 
 type OrderItemResp struct {
@@ -631,7 +633,7 @@ type OrderAttachmentResp struct {
 
 type ShopFinAccountCreateReq struct {
 	AccountName    string         `json:"account_name" binding:"required"`
-	AccountType    int16          `json:"account_type" binding:"required,oneof=1 2 3"`
+	AccountType    int16          `json:"account_type" binding:"required,oneof=1 2"`
 	AccountNo      string         `json:"account_no"`
 	InitialBalance float64        `json:"initial_balance"`
 	Config         datatypes.JSON `json:"config"`
@@ -659,6 +661,7 @@ type ShopFinAccountResp struct {
 	AccountType    int16          `json:"account_type"`
 	AccountNo      string         `json:"account_no"`
 	InitialBalance float64        `json:"initial_balance"`
+	Balance        float64        `json:"balance"`
 	Config         datatypes.JSON `json:"config"`
 	Status         int16          `json:"status"`
 	CreatedAt      time.Time      `json:"created_at"`
@@ -692,12 +695,16 @@ type FinanceRecordListReq struct {
 	PageSize     int     `form:"page_size"`
 	RecordNo     string  `form:"record_no"`
 	AccountID    *uint64 `form:"account_id"`
+	AccountType  *int16  `form:"account_type"`
 	CategoryID   *uint64 `form:"category_id"`
 	CategoryL1   *string `form:"category_l1"`
 	CategoryL2   *string `form:"category_l2"`
 	CategoryL3   *string `form:"category_l3"`
 	RecordType   *int16  `form:"record_type"`
 	ReviewStatus *int16  `form:"review_status"`
+	RecordDateStart string `form:"record_date_start"`
+	RecordDateEnd   string `form:"record_date_end"`
+	CreatedBy    *uint64 `form:"created_by"`
 }
 
 type FinanceReviewReq struct {

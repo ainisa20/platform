@@ -7,6 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const orderStatusCancelled int16 = 4
+
 type OrderRepository interface {
 	ListGroups(db *gorm.DB, tenantID uint64, req *dto.OrderListReq) ([]entity.OrderGroup, int64, error)
 	GetGroup(db *gorm.DB, id uint64) (*entity.OrderGroup, error)
@@ -18,6 +20,10 @@ type OrderRepository interface {
 	GetItem(db *gorm.DB, id uint64) (*entity.OrderItem, error)
 	CreateItem(db *gorm.DB, item *entity.OrderItem) error
 	UpdateItem(db *gorm.DB, item *entity.OrderItem) error
+
+	CreateItemNodes(db *gorm.DB, nodes []entity.OrderItemNode) error
+	ListItemNodes(db *gorm.DB, itemID uint64) ([]entity.OrderItemNode, error)
+	ListItemsNodes(db *gorm.DB, itemIDs []uint64) ([]entity.OrderItemNode, error)
 
 	ListWorkflowLogs(db *gorm.DB, itemID uint64) ([]entity.OrderWorkflowLog, error)
 	CreateWorkflowLog(db *gorm.DB, log *entity.OrderWorkflowLog) error
@@ -46,6 +52,9 @@ func (r *orderRepository) ListGroups(db *gorm.DB, tenantID uint64, req *dto.Orde
 	}
 	if req.OrderStatus != nil {
 		q = q.Where("order_status = ?", *req.OrderStatus)
+	}
+	if req.ExcludeCancelled {
+		q = q.Where("order_status <> ?", orderStatusCancelled)
 	}
 
 	if err := q.Count(&total).Error; err != nil {
@@ -151,4 +160,20 @@ func (r *orderRepository) GetAttachment(db *gorm.DB, id uint64) (*entity.OrderAt
 
 func (r *orderRepository) CreateAttachment(db *gorm.DB, a *entity.OrderAttachment) error {
 	return db.Create(a).Error
+}
+
+func (r *orderRepository) CreateItemNodes(db *gorm.DB, nodes []entity.OrderItemNode) error {
+	return db.Create(&nodes).Error
+}
+
+func (r *orderRepository) ListItemNodes(db *gorm.DB, itemID uint64) ([]entity.OrderItemNode, error) {
+	var nodes []entity.OrderItemNode
+	err := db.Where("order_item_id = ?", itemID).Order("node_index ASC").Find(&nodes).Error
+	return nodes, err
+}
+
+func (r *orderRepository) ListItemsNodes(db *gorm.DB, itemIDs []uint64) ([]entity.OrderItemNode, error) {
+	var nodes []entity.OrderItemNode
+	err := db.Where("order_item_id IN ?", itemIDs).Order("node_index ASC").Find(&nodes).Error
+	return nodes, err
 }
