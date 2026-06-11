@@ -117,23 +117,48 @@ func (s *OrderService) Get(c *gin.Context, db *gorm.DB, tenantID, id uint64) (*d
 	if err != nil {
 		return nil, err
 	}
-	productIDs := make([]uint64, 0, len(items))
+	itemIDs := make([]uint64, 0, len(items))
 	for _, it := range items {
-		productIDs = append(productIDs, it.ShopProductID)
+		itemIDs = append(itemIDs, it.ID)
 	}
-	wfMap := s.loadWorkflowByShopProduct(db, productIDs)
+	allNodes, _ := s.repo.ListItemsNodes(db, itemIDs)
+	nodeMap := make(map[uint64][]entity.OrderItemNode)
+	for _, n := range allNodes {
+		nodeMap[n.OrderItemID] = append(nodeMap[n.OrderItemID], n)
+	}
+	var fallbackIDs []uint64
+	for _, it := range items {
+		if len(nodeMap[it.ID]) == 0 {
+			fallbackIDs = append(fallbackIDs, it.ShopProductID)
+		}
+	}
+	var fallbackMap map[uint64][]entity.ProductWorkflowNode
+	if len(fallbackIDs) > 0 {
+		fallbackMap = s.loadWorkflowByShopProductIDs(db, fallbackIDs)
+	}
 	itemResps := make([]dto.OrderItemResp, 0, len(items))
 	for i := range items {
 		it := &items[i]
-		nodes := wfMap[it.ShopProductID]
+		nodes := nodeMap[it.ID]
 		currentName := ""
 		nextName := ""
-		for _, n := range nodes {
-			if n.NodeIndex == it.CurrentNodeIndex {
-				currentName = n.NodeName
+		if len(nodes) > 0 {
+			for _, n := range nodes {
+				if n.NodeIndex == it.CurrentNodeIndex {
+					currentName = n.NodeName
+				}
+				if n.NodeIndex == it.CurrentNodeIndex+1 {
+					nextName = n.NodeName
+				}
 			}
-			if n.NodeIndex == it.CurrentNodeIndex+1 {
-				nextName = n.NodeName
+		} else if fallbackMap != nil {
+			for _, n := range fallbackMap[it.ShopProductID] {
+				if n.NodeIndex == it.CurrentNodeIndex {
+					currentName = n.NodeName
+				}
+				if n.NodeIndex == it.CurrentNodeIndex+1 {
+					nextName = n.NodeName
+				}
 			}
 		}
 		itemResps = append(itemResps, dto.OrderItemResp{
@@ -191,6 +216,7 @@ func (s *OrderService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy u
 		ShopProductID uint64
 		ShopPrice     float64
 		ProductName   string
+		WFNodes       []entity.ProductWorkflowNode
 	}
 	metas := make([]productMeta, 0, len(req.Items))
 	for _, it := range req.Items {
@@ -218,6 +244,7 @@ func (s *OrderService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy u
 			ShopProductID: sp.ID,
 			ShopPrice:     sp.ShopPrice,
 			ProductName:   sp.ProductName,
+			WFNodes:       nodes,
 		})
 	}
 	var createdGroup *entity.OrderGroup
@@ -242,6 +269,7 @@ func (s *OrderService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy u
 		if err := s.repo.CreateGroup(tx, group); err != nil {
 			return fmt.Errorf("create order group: %w", err)
 		}
+		var allSnapshotNodes []entity.OrderItemNode
 		for i, it := range req.Items {
 			total := metas[i].ShopPrice * float64(it.Quantity)
 			item := &entity.OrderItem{
@@ -259,6 +287,19 @@ func (s *OrderService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy u
 			}
 			if err := s.repo.CreateItem(tx, item); err != nil {
 				return fmt.Errorf("create order item: %w", err)
+			}
+			for _, n := range metas[i].WFNodes {
+				allSnapshotNodes = append(allSnapshotNodes, entity.OrderItemNode{
+					OrderItemID: item.ID,
+					NodeIndex:   n.NodeIndex,
+					NodeCode:    n.NodeCode,
+					NodeName:    n.NodeName,
+				})
+			}
+		}
+		if len(allSnapshotNodes) > 0 {
+			if err := s.repo.CreateItemNodes(tx, allSnapshotNodes); err != nil {
+				return fmt.Errorf("create item nodes snapshot: %w", err)
 			}
 		}
 		createdGroup = group
@@ -356,6 +397,21 @@ func (s *OrderService) GetItemWorkflow(c *gin.Context, db *gorm.DB, tenantID, id
 	if err != nil {
 		return nil, 0, err
 	}
+	snapshotNodes, err := s.repo.ListItemNodes(db, item.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(snapshotNodes) > 0 {
+		resps := make([]dto.WorkflowNodeResp, 0, len(snapshotNodes))
+		for _, n := range snapshotNodes {
+			resps = append(resps, dto.WorkflowNodeResp{
+				NodeIndex: n.NodeIndex,
+				NodeCode:  n.NodeCode,
+				NodeName:  n.NodeName,
+			})
+		}
+		return resps, item.CurrentNodeIndex, nil
+	}
 	sp, err := s.productRepo.GetByID(db, item.ShopProductID)
 	if err != nil {
 		return nil, 0, err
@@ -422,13 +478,32 @@ func (s *OrderService) AdvanceItemWorkflow(c *gin.Context, db *gorm.DB, tenantID
 	if item.ItemStatus != orderItemStatusPending && item.ItemStatus != orderItemStatusInProcess {
 		return 0, shared.ErrOrderItemCannotCancel
 	}
-	sp, err := s.productRepo.GetByID(db, item.ShopProductID)
+	snapshotNodes, err := s.repo.ListItemNodes(db, item.ID)
 	if err != nil {
 		return 0, err
 	}
-	nodes, err := s.wfRepo.ListByProductID(db, sp.PlatformProductID)
-	if err != nil {
-		return 0, err
+	type nodeInfo struct {
+		NodeIndex int16
+		NodeCode  string
+		NodeName  string
+	}
+	var nodes []nodeInfo
+	if len(snapshotNodes) > 0 {
+		for _, n := range snapshotNodes {
+			nodes = append(nodes, nodeInfo{NodeIndex: n.NodeIndex, NodeCode: n.NodeCode, NodeName: n.NodeName})
+		}
+	} else {
+		sp, err := s.productRepo.GetByID(db, item.ShopProductID)
+		if err != nil {
+			return 0, err
+		}
+		tplNodes, err := s.wfRepo.ListByProductID(db, sp.PlatformProductID)
+		if err != nil {
+			return 0, err
+		}
+		for _, n := range tplNodes {
+			nodes = append(nodes, nodeInfo{NodeIndex: n.NodeIndex, NodeCode: n.NodeCode, NodeName: n.NodeName})
+		}
 	}
 	if len(nodes) == 0 {
 		return 0, shared.ErrWorkflowEmpty
@@ -686,29 +761,7 @@ func recomputeOrderStatus(items []entity.OrderItem) int16 {
 	return orderStatusInProcess
 }
 
-func (s *OrderService) fetchUserNames(db *gorm.DB, ids []uint64) map[uint64]string {
-	result := make(map[uint64]string, len(ids))
-	if len(ids) == 0 {
-		return result
-	}
-	type row struct {
-		ID       uint64
-		RealName string
-	}
-	var rows []row
-	if err := db.Table("sys_user").
-		Select("id, real_name").
-		Where("id IN ?", ids).
-		Scan(&rows).Error; err != nil {
-		return result
-	}
-	for _, r := range rows {
-		result[r.ID] = r.RealName
-	}
-	return result
-}
-
-func (s *OrderService) loadWorkflowByShopProduct(db *gorm.DB, shopProductIDs []uint64) map[uint64][]entity.ProductWorkflowNode {
+func (s *OrderService) loadWorkflowByShopProductIDs(db *gorm.DB, shopProductIDs []uint64) map[uint64][]entity.ProductWorkflowNode {
 	result := make(map[uint64][]entity.ProductWorkflowNode)
 	if len(shopProductIDs) == 0 {
 		return result
@@ -737,6 +790,30 @@ func (s *OrderService) loadWorkflowByShopProduct(db *gorm.DB, shopProductIDs []u
 	}
 	return result
 }
+
+func (s *OrderService) fetchUserNames(db *gorm.DB, ids []uint64) map[uint64]string {
+	result := make(map[uint64]string, len(ids))
+	if len(ids) == 0 {
+		return result
+	}
+	type row struct {
+		ID       uint64
+		RealName string
+	}
+	var rows []row
+	if err := db.Table("sys_user").
+		Select("id, real_name").
+		Where("id IN ?", ids).
+		Scan(&rows).Error; err != nil {
+		return result
+	}
+	for _, r := range rows {
+		result[r.ID] = r.RealName
+	}
+	return result
+}
+
+
 
 func collectOrderCreatedBy(groups []entity.OrderGroup) []uint64 {
 	idSet := make(map[uint64]struct{}, len(groups))

@@ -342,6 +342,17 @@ type OrderItem struct {
 
 func (OrderItem) TableName() string { return "order_item" }
 
+type OrderItemNode struct {
+	ID          uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderItemID uint64    `gorm:"not null;index" json:"order_item_id"`
+	NodeIndex   int16     `gorm:"not null" json:"node_index"`
+	NodeCode    string    `gorm:"type:varchar(32);not null" json:"node_code"`
+	NodeName    string    `gorm:"type:varchar(64);not null" json:"node_name"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (OrderItemNode) TableName() string { return "order_item_node" }
+
 type OrderWorkflowLog struct {
 	ID           uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
 	TenantID     uint64    `gorm:"not null;index" json:"tenant_id"`
@@ -420,3 +431,20 @@ type FinanceAttachment struct {
 }
 
 func (FinanceAttachment) TableName() string { return "finance_attachment" }
+
+type ExportTask struct {
+	ID          uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	TenantID    uint64     `gorm:"not null;index" json:"tenant_id"`
+	TaskType    string     `gorm:"type:varchar(64);not null" json:"task_type"`
+	Status      int16      `gorm:"default:0" json:"status"`
+	TotalCount  int        `gorm:"default:0" json:"total_count"`
+	DoneCount   int        `gorm:"default:0" json:"done_count"`
+	FileKey     string     `gorm:"type:varchar(500)" json:"file_key"`
+	FileName    string     `gorm:"type:varchar(255)" json:"file_name"`
+	ErrorMsg    string     `gorm:"type:varchar(500)" json:"error_msg"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	CreatedBy   uint64     `json:"created_by"`
+	CompletedAt *time.Time `json:"completed_at"`
+}
+
+func (ExportTask) TableName() string { return "export_task" }
