@@ -11,6 +11,9 @@ import {
   deleteRecord,
   reviewRecord,
   exportRecords,
+  startExportZip,
+  getExportTaskStatus,
+  downloadExportZip,
   getRecordAttachments,
   createRecordAttachment,
   downloadRecordAttachment,
@@ -18,6 +21,7 @@ import {
 import { getFinAccountList } from '@/api/shop/account'
 import { getShopFinCategories } from '@/api/shop/finance'
 import { getOrderList } from '@/api/shop/order'
+import { getUserList } from '@/api/shop/user'
 import type {
   FinanceRecordResp,
   FinanceRecordCreateReq,
@@ -27,6 +31,7 @@ import type {
   ShopFinAccountResp,
   ShopFinCategoryResp,
   OrderResp,
+  UserResp,
 } from '@/types/system'
 
 const loading = ref(false)
@@ -60,10 +65,13 @@ function findCategoryPath(leafId: number) {
 
 const searchForm = reactive({
   record_no: '',
+  account_type: null as number | null,
   category_l1: '',
   category_l2: '',
   category_l3: '',
   review_status: null as number | null,
+  record_date_range: [] as string[],
+  created_by: null as number | null,
 })
 
 // Search category cascade options
@@ -90,10 +98,14 @@ async function fetchList() {
       page: pagination.page,
       page_size: pagination.page_size,
       record_no: searchForm.record_no || undefined,
+      account_type: searchForm.account_type ?? undefined,
       category_l1: searchForm.category_l1 || undefined,
       category_l2: searchForm.category_l2 || undefined,
       category_l3: searchForm.category_l3 || undefined,
       review_status: searchForm.review_status ?? undefined,
+      record_date_start: searchForm.record_date_range?.[0] || undefined,
+      record_date_end: searchForm.record_date_range?.[1] || undefined,
+      created_by: searchForm.created_by ?? undefined,
     })
     tableData.value = res.data.data.list
     total.value = res.data.data.total
@@ -109,10 +121,13 @@ function handleSearch() {
 
 function handleReset() {
   searchForm.record_no = ''
+  searchForm.account_type = null
   searchForm.category_l1 = ''
   searchForm.category_l2 = ''
   searchForm.category_l3 = ''
   searchForm.review_status = null
+  searchForm.record_date_range = []
+  searchForm.created_by = null
   pagination.page = 1
   fetchList()
 }
@@ -159,7 +174,11 @@ function formatFileSize(bytes: number): string {
 async function handleExport() {
   const res = await exportRecords({
     record_no: searchForm.record_no || undefined,
+    account_type: searchForm.account_type ?? undefined,
     review_status: searchForm.review_status ?? undefined,
+    record_date_start: searchForm.record_date_range?.[0] || undefined,
+    record_date_end: searchForm.record_date_range?.[1] || undefined,
+    created_by: searchForm.created_by ?? undefined,
   })
   const data = res.data.data
   if (!data || data.length === 0) {
@@ -194,6 +213,97 @@ async function handleExport() {
   ElMessage.success('导出成功')
 }
 
+const exportZipLoading = ref(false)
+const exportZipTaskId = ref<number | null>(null)
+const exportZipStatus = ref(0)
+const exportZipTotal = ref(0)
+const exportZipDone = ref(0)
+const exportZipErrorMsg = ref('')
+let exportZipTimer: ReturnType<typeof setInterval> | null = null
+
+async function handleExportZip() {
+  exportZipLoading.value = true
+  exportZipErrorMsg.value = ''
+  try {
+    const res = await startExportZip({
+      record_no: searchForm.record_no || undefined,
+      account_type: searchForm.account_type ?? undefined,
+      review_status: searchForm.review_status ?? undefined,
+      record_date_start: searchForm.record_date_range?.[0] || undefined,
+      record_date_end: searchForm.record_date_range?.[1] || undefined,
+      created_by: searchForm.created_by ?? undefined,
+    })
+    const task = res.data.data
+    exportZipTaskId.value = task.id
+    exportZipStatus.value = task.status
+    exportZipTotal.value = task.total_count
+    exportZipDone.value = task.done_count
+    pollExportStatus()
+  } catch (e: any) {
+    exportZipLoading.value = false
+    ElMessage.error(e?.response?.data?.message || '发起导出失败')
+  }
+}
+
+function pollExportStatus() {
+  if (exportZipTimer) clearInterval(exportZipTimer)
+  exportZipTimer = setInterval(async () => {
+    if (!exportZipTaskId.value) return
+    try {
+      const res = await getExportTaskStatus(exportZipTaskId.value)
+      const task = res.data.data
+      exportZipStatus.value = task.status
+      exportZipDone.value = task.done_count
+      exportZipTotal.value = task.total_count
+      if (task.status === 1) {
+        clearInterval(exportZipTimer!)
+        exportZipTimer = null
+        exportZipLoading.value = false
+        exportZipStatus.value = 1
+        exportZipDone.value = task.done_count
+        handleDownloadExportZip()
+      } else if (task.status === 2) {
+        clearInterval(exportZipTimer!)
+        exportZipTimer = null
+        exportZipLoading.value = false
+        exportZipErrorMsg.value = task.error_msg || '导出失败'
+        ElMessage.error(exportZipErrorMsg.value)
+      }
+    } catch {
+      clearInterval(exportZipTimer!)
+      exportZipTimer = null
+      exportZipLoading.value = false
+    }
+  }, 2000)
+}
+
+async function handleDownloadExportZip() {
+  if (!exportZipTaskId.value) return
+  try {
+    const res = await downloadExportZip(exportZipTaskId.value, { responseType: 'blob' })
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    const disposition = res.headers['content-disposition'] || ''
+    const starMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+    const plainMatch = disposition.match(/filename="?([^"]+?)"?$/i)
+    let filename = 'export.zip'
+    if (starMatch) {
+      filename = decodeURIComponent(starMatch[1])
+    } else if (plainMatch) {
+      filename = decodeURIComponent(plainMatch[1])
+    }
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '下载失败')
+  }
+}
+
 const dialogVisible = ref(false)
 const dialogTitle = ref('新建记录')
 const isEdit = ref(false)
@@ -204,6 +314,7 @@ const formRef = ref<FormInstance>()
 const accountOptions = ref<ShopFinAccountResp[]>([])
 const categoryOptions = ref<ShopFinCategoryResp[]>([])
 const orderOptions = ref<OrderResp[]>([])
+const userOptions = ref<UserResp[]>([])
 const isReadonly = ref(false)
 
 interface RecordFormData {
@@ -263,8 +374,20 @@ async function loadCategories() {
 }
 
 async function loadOrders() {
-  const res = await getOrderList({ page: 1, page_size: 1000 })
-  orderOptions.value = res.data.data.list
+  const res = await getOrderList({ page: 1, page_size: 1000, exclude_cancelled: true })
+  const allOrders = res.data.data.list || []
+  const usedOrderIDs = new Set(
+    tableData.value
+      .filter(r => r.id !== editId.value && r.order_group_id)
+      .map(r => r.order_group_id!)
+  )
+  const currentOrderID = tableData.value.find(r => r.id === editId.value)?.order_group_id
+  orderOptions.value = allOrders.filter(o => !usedOrderIDs.has(o.id) || o.id === currentOrderID)
+}
+
+async function loadUsers() {
+  const res = await getUserList({ page: 1, page_size: 1000 })
+  userOptions.value = res.data.data.list
 }
 
 // Dialog category cascade options
@@ -311,9 +434,10 @@ async function openCreateDialog() {
   isReadonly.value = false
   dialogTitle.value = '新建记录'
   editId.value = 0
+  createAttachments.value = []
   resetForm()
   dialogVisible.value = true
-  await Promise.all([loadAccounts(), loadCategories(), loadOrders()])
+  await Promise.all([loadAccounts(), flatCategories.value.length === 0 ? loadCategories() : Promise.resolve(), loadOrders()])
 }
 
 async function openEditDialog(row: FinanceRecordResp) {
@@ -325,7 +449,8 @@ async function openEditDialog(row: FinanceRecordResp) {
   isReadonly.value = false
   dialogTitle.value = '编辑记录'
   editId.value = row.id
-  await Promise.all([loadAccounts(), loadCategories(), loadOrders()])
+  createAttachments.value = []
+  await Promise.all([loadAccounts(), flatCategories.value.length === 0 ? loadCategories() : Promise.resolve(), loadOrders()])
   const res = await getRecord(row.id)
   const r = res.data.data
   const path = findCategoryPath(r.category_id)
@@ -348,9 +473,12 @@ async function openDetailDialog(row: FinanceRecordResp) {
   isReadonly.value = true
   dialogTitle.value = '记录详情'
   editId.value = row.id
-  await Promise.all([loadAccounts(), loadCategories(), loadOrders()])
+  createAttachments.value = []
+  detailAttachments.value = []
+  await Promise.all([loadAccounts(), flatCategories.value.length === 0 ? loadCategories() : Promise.resolve(), loadOrders()])
   const res = await getRecord(row.id)
   const r = res.data.data
+  detailRecord.value = r
   const path = findCategoryPath(r.category_id)
   Object.assign(formData, {
     account_id: r.account_id,
@@ -363,8 +491,17 @@ async function openDetailDialog(row: FinanceRecordResp) {
     record_date: r.record_date ? r.record_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
     remark: r.remark || '',
   })
+  try {
+    const attRes = await getRecordAttachments(row.id)
+    detailAttachments.value = attRes.data.data || []
+  } catch { /* ignore */ }
   dialogVisible.value = true
 }
+
+const createAttachments = ref<File[]>([])
+const createUploadingFile = ref(false)
+const detailRecord = ref<FinanceRecordResp | null>(null)
+const detailAttachments = ref<FinanceAttachmentResp[]>([])
 
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
@@ -383,6 +520,9 @@ async function handleSubmit() {
         remark: formData.remark || undefined,
       }
       await updateRecord(editId.value, data)
+      if (createAttachments.value.length > 0) {
+        await uploadAttachmentsForRecord(editId.value, createAttachments.value)
+      }
       ElMessage.success('更新成功')
     } else {
       const data: FinanceRecordCreateReq = {
@@ -394,7 +534,15 @@ async function handleSubmit() {
         record_date: formData.record_date,
         remark: formData.remark || undefined,
       }
-      await createRecord(data)
+      const res = await createRecord(data)
+      const newId = res.data.data?.id
+      if (newId && createAttachments.value.length > 0) {
+        try {
+          await uploadAttachmentsForRecord(newId, createAttachments.value)
+        } catch {
+          ElMessage.warning('记录已创建，但附件上传失败，可在详情页补传')
+        }
+      }
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
@@ -402,6 +550,27 @@ async function handleSubmit() {
   } finally {
     submitLoading.value = false
   }
+}
+
+async function uploadAttachmentsForRecord(recordId: number, files: File[]) {
+  for (const file of files) {
+    const fd = new FormData()
+    fd.append('file', file)
+    await createRecordAttachment(recordId, fd)
+  }
+}
+
+function handleCreateFileChange(file: File) {
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('单个文件不能超过 10MB')
+    return false
+  }
+  createAttachments.value.push(file)
+  return false
+}
+
+function removeCreateAttachment(index: number) {
+  createAttachments.value.splice(index, 1)
 }
 
 async function handleDelete(row: FinanceRecordResp) {
@@ -536,7 +705,28 @@ async function handleDownloadAttachment(row: FinanceAttachmentResp) {
   }
 }
 
-onMounted(fetchList)
+async function handleDownloadDetailAttachment(row: FinanceAttachmentResp) {
+  if (!editId.value) return
+  try {
+    const res = await downloadRecordAttachment(editId.value, row.id)
+    const url = res.data.data?.url
+    if (url) {
+      window.open(url, '_blank')
+    }
+  } catch {
+    ElMessage.error('获取下载链接失败')
+  }
+}
+
+function handlePrint() {
+  window.print()
+}
+
+onMounted(() => {
+  fetchList()
+  loadCategories()
+  loadUsers()
+})
 </script>
 
 <template>
@@ -545,6 +735,12 @@ onMounted(fetchList)
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="记录号">
           <el-input v-model="searchForm.record_no" placeholder="请输入记录号" clearable style="width: 200px" />
+        </el-form-item>
+        <el-form-item label="账户类型">
+          <el-select v-model="searchForm.account_type" placeholder="全部" clearable style="width: 120px">
+            <el-option label="对公" :value="1" />
+            <el-option label="对私" :value="2" />
+          </el-select>
         </el-form-item>
         <el-form-item label="一级分类">
           <el-select v-model="searchForm.category_l1" placeholder="全部" clearable style="width: 150px" @change="onSearchL1Change">
@@ -568,6 +764,22 @@ onMounted(fetchList)
             <el-option label="已驳回" :value="3" />
           </el-select>
         </el-form-item>
+        <el-form-item label="记账日期">
+          <el-date-picker
+            v-model="searchForm.record_date_range"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 260px"
+          />
+        </el-form-item>
+        <el-form-item label="创建人">
+          <el-select v-model="searchForm.created_by" placeholder="全部" clearable filterable style="width: 140px">
+            <el-option v-for="u in userOptions" :key="u.id" :label="u.real_name || u.username" :value="u.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
           <el-button @click="handleReset">重置</el-button>
@@ -580,19 +792,39 @@ onMounted(fetchList)
         <el-button v-permission="'shop:finance:record:create'" type="primary" @click="openCreateDialog">
           新建记录
         </el-button>
-        <el-button v-permission="'shop:finance:record:export'" type="success" @click="handleExport">
-          导出
+        <el-button v-permission="'shop:finance:record:export'" @click="handleExport">
+          导出CSV
+        </el-button>
+        <el-button v-permission="'shop:finance:record:export-zip'" type="success" :loading="exportZipLoading" @click="handleExportZip">
+          {{ exportZipStatus === 1 ? '下载ZIP' : '导出含附件' }}
+        </el-button>
+        <template v-if="exportZipLoading">
+          <el-progress :percentage="exportZipTotal ? Math.round(exportZipDone / exportZipTotal * 100) : 0" :stroke-width="6" style="width: 200px; display: inline-flex; margin-left: 8px;" />
+          <span style="font-size: 12px; color: #999; margin-left: 4px;">{{ exportZipDone }}/{{ exportZipTotal }}</span>
+        </template>
+        <el-button v-if="exportZipStatus === 1 && exportZipTaskId && !exportZipLoading" type="primary" link @click="handleDownloadExportZip">
+          重新下载
         </el-button>
       </div>
 
       <el-table v-loading="loading" :data="tableData" border stripe style="width: 100%">
         <el-table-column prop="id" label="序号" width="70" align="center" />
         <el-table-column prop="record_no" label="记录号" min-width="180" />
-        <el-table-column prop="account_name" label="账户名" min-width="120" />
-        <el-table-column prop="category_l1" label="一级分类" min-width="120" />
-        <el-table-column prop="category_l2" label="二级分类" min-width="120" />
-        <el-table-column prop="category_l3" label="三级分类" min-width="120" />
-        <el-table-column label="类型" width="80" align="center">
+        <el-table-column label="记账日期" min-width="110">
+          <template #default="{ row }">
+            {{ row.record_date || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="account_name" label="账户" min-width="120" />
+        <el-table-column label="账户类型" width="90" align="center">
+          <template #default="{ row }">
+            {{ row.account_type === 1 ? '对公' : row.account_type === 2 ? '对私' : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="category_l1" label="一级分类" min-width="110" />
+        <el-table-column prop="category_l2" label="二级分类" min-width="110" />
+        <el-table-column prop="category_l3" label="三级分类" min-width="110" />
+        <el-table-column label="收支" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="recordTypeTagType(row.record_type)" size="small">
               {{ recordTypeText(row.record_type) }}
@@ -616,52 +848,42 @@ onMounted(fetchList)
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="记账日期" min-width="110">
-          <template #default="{ row }">
-            {{ row.record_date || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="创建人" min-width="100">
+        <el-table-column label="创建人" min-width="90">
           <template #default="{ row }">
             {{ row.created_by_name || row.created_by || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" min-width="170">
-          <template #default="{ row }">
-            {{ formatTime(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="320" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="openDetailDialog(row)">
               详情
             </el-button>
             <el-button
+              v-if="row.review_status !== 2"
               v-permission="'shop:finance:record:audit'"
               type="success"
               link
               size="small"
-              :disabled="row.review_status === 2"
               @click="openReviewDialog(row)"
             >
               审核
             </el-button>
             <el-button
+              v-if="row.review_status !== 2"
               v-permission="'shop:finance:record:update'"
               type="primary"
               link
               size="small"
-              :disabled="row.review_status === 2"
               @click="openEditDialog(row)"
             >
               编辑
             </el-button>
             <el-button
+              v-if="row.review_status !== 2"
               v-permission="'shop:finance:record:delete'"
               type="danger"
               link
               size="small"
-              :disabled="row.review_status === 2"
               @click="handleDelete(row)"
             >
               删除
@@ -692,68 +914,132 @@ onMounted(fetchList)
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px" :disabled="isReadonly">
-        <el-form-item label="账户" prop="account_id">
-          <el-select v-model="formData.account_id" placeholder="请选择账户" filterable style="width: 100%">
-            <el-option
-              v-for="a in accountOptions"
-              :key="a.id"
-              :label="a.account_name"
-              :value="a.id"
+      <div :class="{ 'print-area': isReadonly }">
+        <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px" :disabled="isReadonly">
+          <el-form-item label="记账日期" prop="record_date">
+            <el-date-picker
+              v-model="formData.record_date"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="请选择记账日期"
+              style="width: 100%"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="分类" prop="category_id">
-          <el-space alignment="flex-start" wrap>
-            <el-select v-model="formData.category_l1_id" placeholder="一级分类" style="width: 180px" @change="onDialogL1Change">
-              <el-option v-for="c in dialogL1Options" :key="c.id" :label="c.category_name" :value="c.id" />
-            </el-select>
-            <el-select v-model="formData.category_l2_id" placeholder="二级分类" :disabled="!formData.category_l1_id" style="width: 180px" @change="onDialogL2Change">
-              <el-option v-for="c in dialogL2Options" :key="c.id" :label="c.category_name" :value="c.id" />
-            </el-select>
-            <el-select v-model="formData.category_id" placeholder="三级分类" :disabled="!formData.category_l2_id" style="width: 180px" @change="onDialogL3Change">
-              <el-option v-for="c in dialogL3Options" :key="c.id" :label="c.category_name" :value="c.id" />
-            </el-select>
-          </el-space>
-        </el-form-item>
-        <el-form-item label="金额" prop="amount">
-          <el-input-number
-            v-model="formData.amount"
-            :precision="2"
-            :min="0"
-            :step="100"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="关联订单">
-          <el-select v-model="formData.order_group_id" placeholder="请选择关联订单" filterable clearable style="width: 100%">
-            <el-option
-              v-for="o in orderOptions"
-              :key="o.id"
-              :label="o.order_no"
-              :value="o.id"
+          </el-form-item>
+          <el-form-item label="分类" prop="category_id">
+            <el-space alignment="flex-start" wrap>
+              <el-select v-model="formData.category_l1_id" placeholder="一级分类" style="width: 180px" @change="onDialogL1Change">
+                <el-option v-for="c in dialogL1Options" :key="c.id" :label="c.category_name" :value="c.id" />
+              </el-select>
+              <el-select v-model="formData.category_l2_id" placeholder="二级分类" :disabled="!formData.category_l1_id" style="width: 180px" @change="onDialogL2Change">
+                <el-option v-for="c in dialogL2Options" :key="c.id" :label="c.category_name" :value="c.id" />
+              </el-select>
+              <el-select v-model="formData.category_id" placeholder="三级分类" :disabled="!formData.category_l2_id" style="width: 180px" @change="onDialogL3Change">
+                <el-option v-for="c in dialogL3Options" :key="c.id" :label="c.category_name" :value="c.id" />
+              </el-select>
+            </el-space>
+          </el-form-item>
+          <el-form-item label="金额" prop="amount">
+            <el-input-number
+              v-model="formData.amount"
+              :precision="2"
+              :min="0"
+              :step="100"
+              style="width: 100%"
             />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="记账日期" prop="record_date">
-          <el-date-picker
-            v-model="formData.record_date"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="请选择记账日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-            v-model="formData.remark"
-            type="textarea"
-            :rows="3"
-            placeholder="请输入备注"
-          />
-        </el-form-item>
-      </el-form>
+          </el-form-item>
+          <el-form-item label="关联订单">
+            <el-select v-model="formData.order_group_id" placeholder="请选择关联订单（可选）" filterable clearable style="width: 100%">
+              <el-option
+                v-for="o in orderOptions"
+                :key="o.id"
+                :label="`${o.order_no} - ${o.customer_name || '未关联客户'} - ¥${Number(o.total_amount || 0).toFixed(2)}`"
+                :value="o.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="账户" prop="account_id">
+            <el-select v-model="formData.account_id" placeholder="请选择账户" filterable style="width: 100%">
+              <el-option
+                v-for="a in accountOptions"
+                :key="a.id"
+                :label="a.account_name"
+                :value="a.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input
+              v-model="formData.remark"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入备注"
+            />
+          </el-form-item>
+        </el-form>
+
+        <div v-if="isReadonly" style="margin-top: 12px">
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="记录号">{{ detailRecord?.record_no }}</el-descriptions-item>
+            <el-descriptions-item label="类型">
+              <el-tag :type="recordTypeTagType(detailRecord?.record_type ?? 1)" size="small">
+                {{ recordTypeText(detailRecord?.record_type ?? 1) }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="实际金额">{{ formatAmount(detailRecord?.actual_amount) }}</el-descriptions-item>
+            <el-descriptions-item label="审核状态">
+              <el-tag :type="reviewStatusTagType(detailRecord?.review_status ?? 1)" size="small">
+                {{ reviewStatusText(detailRecord?.review_status ?? 1) }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="审核人">{{ detailRecord?.review_by_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="审核时间">{{ formatTime(detailRecord?.review_at ?? null) }}</el-descriptions-item>
+            <el-descriptions-item label="创建人">{{ detailRecord?.created_by_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatTime(detailRecord?.created_at ?? null) }}</el-descriptions-item>
+          </el-descriptions>
+
+          <div v-if="detailAttachments.length > 0" style="margin-top: 12px">
+            <div style="font-size: 14px; font-weight: 500; color: #303133; margin-bottom: 8px">附件</div>
+            <div v-for="att in detailAttachments" :key="att.id" style="display: flex; align-items: center; gap: 8px; padding: 4px 0">
+              <el-icon><Document /></el-icon>
+              <span style="font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ att.file_name }}</span>
+              <span style="font-size: 12px; color: #909399">{{ formatFileSize(att.file_size) }}</span>
+              <el-button type="primary" link size="small" @click="handleDownloadDetailAttachment(att)">下载</el-button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!isReadonly" style="margin-top: 8px">
+          <div style="display: flex; align-items: center; margin-bottom: 8px">
+            <span style="font-size: 14px; font-weight: 500; color: #303133">发票附件</span>
+            <span style="font-size: 12px; color: #909399; margin-left: 8px">（可选）</span>
+          </div>
+          <el-upload
+            :http-request="() => {}"
+            :before-upload="handleCreateFileChange"
+            :show-file-list="false"
+            accept=".jpg,.jpeg,.png,.pdf"
+          >
+            <el-button size="small" type="primary" plain>选择文件</el-button>
+            <template #tip>
+              <div style="font-size: 12px; color: #909399; margin-top: 4px">
+                支持 jpg/png/pdf，单个文件不超过 10MB
+              </div>
+            </template>
+          </el-upload>
+          <div v-if="createAttachments.length > 0" style="margin-top: 8px">
+            <div v-for="(file, idx) in createAttachments" :key="idx" style="display: flex; align-items: center; gap: 8px; padding: 4px 0">
+              <el-icon><Document /></el-icon>
+              <span style="font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ file.name }}</span>
+              <span style="font-size: 12px; color: #909399">{{ formatFileSize(file.size) }}</span>
+              <el-button type="danger" link size="small" @click="removeCreateAttachment(idx)">移除</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
       <template #footer>
+        <el-button v-if="isReadonly" type="primary" @click="handlePrint">
+          打印
+        </el-button>
         <el-button @click="dialogVisible = false">{{ isReadonly ? '关闭' : '取消' }}</el-button>
         <el-button v-if="!isReadonly" type="primary" :loading="submitLoading" @click="handleSubmit">
           确定
@@ -848,4 +1134,15 @@ onMounted(fetchList)
 .table-header { margin-bottom: 16px; display: flex; gap: 8px; }
 .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
 .review-summary { margin-top: 8px; }
+</style>
+
+<style>
+@media print {
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+  .el-dialog__footer { display: none !important; }
+  .el-overlay { position: static !important; }
+  .el-dialog { position: static !important; margin: 0 !important; box-shadow: none !important; }
+}
 </style>
