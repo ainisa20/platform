@@ -118,6 +118,22 @@ const defaultForm = (): ProductFormData => ({
 })
 
 const formData = reactive<ProductFormData>(defaultForm())
+const formNodes = ref<WorkflowNodeReq[]>([])
+
+function autoFillFormNodeCode(node: WorkflowNodeReq) {
+  if (!formData.product_code) return
+  node.node_code = buildNodeCode(formData.product_code, node.node_name)
+}
+
+function addFormNode() {
+  const nextIndex = formNodes.value.length + 1
+  formNodes.value.push({ node_index: nextIndex, node_code: '', node_name: '' })
+}
+
+function removeFormNode(index: number) {
+  formNodes.value.splice(index, 1)
+  formNodes.value.forEach((n, i) => { n.node_index = i + 1 })
+}
 
 const formRules = reactive<FormRules>({
   product_code: [{ required: true, message: '请输入商品编号', trigger: 'blur' }],
@@ -131,12 +147,16 @@ function openCreateDialog() {
   dialogTitle.value = '新增商品'
   editId.value = 0
   Object.assign(formData, defaultForm())
+  formNodes.value = []
   dialogVisible.value = true
 }
 
 function autoFillProductCode() {
   if (isEdit.value) return
   formData.product_code = initialsUpper(formData.product_name)
+  formNodes.value.forEach(n => {
+    if (n.node_name) n.node_code = buildNodeCode(formData.product_code, n.node_name)
+  })
 }
 
 function openEditDialog(row: ProductResp) {
@@ -158,6 +178,23 @@ function openEditDialog(row: ProductResp) {
 async function handleSubmit() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
+
+  if (!isEdit.value) {
+    if (formNodes.value.length === 0) {
+      ElMessage.warning('请至少添加一个流程节点')
+      return
+    }
+    for (const node of formNodes.value) {
+      if (!node.node_name.trim()) {
+        ElMessage.warning(`第 ${node.node_index} 个节点名称不能为空`)
+        return
+      }
+      if (!node.node_code.trim()) {
+        ElMessage.warning(`第 ${node.node_index} 个节点编码不能为空`)
+        return
+      }
+    }
+  }
 
   submitLoading.value = true
   try {
@@ -181,6 +218,7 @@ async function handleSubmit() {
         sort: formData.sort,
         status: formData.status,
         description: formData.description || undefined,
+        workflow_nodes: formNodes.value,
       }
       await createProduct(createData)
       ElMessage.success('创建成功')
@@ -424,7 +462,7 @@ onMounted(() => {
       </div>
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px" :close-on-click-modal="false" destroy-on-close>
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
         <el-form-item label="商品名称" prop="product_name">
           <el-input
@@ -458,6 +496,31 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="商品描述" prop="description">
           <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入商品描述" />
+        </el-form-item>
+        <el-form-item v-if="!isEdit" label="流程节点">
+          <div style="width: 100%">
+            <el-button type="primary" size="small" @click="addFormNode" style="margin-bottom: 8px">添加节点</el-button>
+            <el-table :data="formNodes" border size="small" style="width: 100%">
+              <el-table-column label="序号" width="60" align="center">
+                <template #default="{ row }">{{ row.node_index }}</template>
+              </el-table-column>
+              <el-table-column label="节点名称" min-width="160">
+                <template #default="{ row }">
+                  <el-input v-model="row.node_name" placeholder="节点名称" size="small" @input="autoFillFormNodeCode(row)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="节点编码" min-width="180">
+                <template #default="{ row }">
+                  <el-input v-model="row.node_code" placeholder="自动生成，可修改" size="small" />
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="60" align="center">
+                <template #default="{ $index }">
+                  <el-button type="danger" link size="small" @click="removeFormNode($index)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
