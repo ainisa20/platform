@@ -51,3 +51,24 @@ export function createRecordAttachment(id: number, formData: FormData) {
 export function downloadRecordAttachment(recordId: number, attId: number) {
   return request.get<ApiResponse<{ url: string }>>(`/v1/shop/finance/records/${recordId}/attachments/${attId}/download`)
 }
+
+export function startExportZip(params?: FinanceRecordListReq) {
+  return request.get<ApiResponse<ExportTaskResp>>('/v1/shop/finance/records/export-zip', { params })
+}
+
+export function getExportTaskStatus(taskId: number) {
+  return request.get<ApiResponse<ExportTaskResp>>(`/v1/shop/finance/records/export-zip/${taskId}`)
+}
+
+export function downloadExportZip(taskId: number, config?: Record<string, any>) {
+  return request.get(`/v1/shop/finance/records/export-zip/${taskId}/download`, config)
+}
+
+export interface ExportTaskResp {
+  id: number
+  status: number
+  total_count: number
+  done_count: number
+  file_name: string
+  error_msg: string
+}
