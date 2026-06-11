@@ -305,6 +305,7 @@ export interface ProductCreateReq {
   sort?: number
   status?: number
   description?: string
+  workflow_nodes: WorkflowNodeReq[]
 }
 
 export interface ProductUpdateReq {
@@ -521,6 +522,7 @@ export interface OrderListReq extends PageReq {
   order_no?: string
   customer_id?: number
   order_status?: number | null
+  exclude_cancelled?: boolean
 }
 
 export interface OrderItemResp {
@@ -606,6 +608,7 @@ export interface ShopFinAccountResp {
   account_type: number
   account_no: string
   initial_balance: number
+  balance: number
   config: ShopFinAccountConfig
   status: number
   created_at: string
@@ -661,12 +664,16 @@ export interface FinanceRecordUpdateReq {
 export interface FinanceRecordListReq extends PageReq {
   record_no?: string
   account_id?: number
+  account_type?: number | null
   category_id?: number
   category_l1?: string
   category_l2?: string
   category_l3?: string
   record_type?: number | null
   review_status?: number | null
+  record_date_start?: string
+  record_date_end?: string
+  created_by?: number | null
 }
 
 export interface FinanceReviewReq {
