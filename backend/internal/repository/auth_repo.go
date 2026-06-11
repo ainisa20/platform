@@ -57,12 +57,14 @@ func (r *AuthRepository) GetUserRoleCodes(userID, tenantID uint64) ([]string, er
 
 func (r *AuthRepository) GetUserPermissionCodes(userID, tenantID uint64) ([]string, error) {
 	var codes []string
-	err := r.db.Table("sys_user_role").
-		Select("DISTINCT sys_permission.perms_code").
-		Joins("JOIN sys_role_permission ON sys_role_permission.role_id = sys_user_role.role_id AND sys_role_permission.tenant_id = ?", tenantID).
-		Joins("JOIN sys_permission ON sys_permission.id = sys_role_permission.permission_id").
-		Where("sys_user_role.user_id = ? AND sys_permission.perms_code != ''", userID).
-		Pluck("sys_permission.perms_code", &codes).Error
+	err := r.db.Raw(`
+		SELECT DISTINCT p.perms_code
+		FROM sys_user_role ur
+		JOIN sys_role_permission rp ON rp.role_id = ur.role_id AND rp.tenant_id = ?
+		JOIN sys_permission p ON p.id = rp.permission_id
+		WHERE ur.user_id = ?
+		  AND p.perms_code IS NOT NULL AND p.perms_code <> ''
+	`, tenantID, userID).Scan(&codes).Error
 	return codes, err
 }
 
