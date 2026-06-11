@@ -9,8 +9,8 @@ import {
   getOrder,
   createOrder,
   cancelOrder,
-  cancelOrderItem,
   exportOrders,
+  getItemWorkflow,
   getItemWorkflowLogs,
   advanceItemWorkflow,
   getItemAttachments,
@@ -24,6 +24,7 @@ import type {
   OrderItemResp,
   OrderCreateReq,
   OrderWorkflowLogResp,
+  OrderWorkflowNodeResp,
   OrderAttachmentResp,
   ShopCustomerResp,
   ShopProductResp,
@@ -105,16 +106,22 @@ function formatAmount(val: number): string {
 const detailDialogVisible = ref(false)
 const detailLoading = ref(false)
 const currentOrder = ref<OrderResp | null>(null)
-type DetailTab = 'items' | 'logs'
-const detailTab = ref<DetailTab>('items')
-const detailLogsLoading = ref(false)
-const detailLogs = ref<(OrderWorkflowLogResp & { product_name: string })[]>([])
+const expandedItemId = ref<number | null>(null)
+const expandLoading = ref(false)
+
+interface ExpandData {
+  nodes: OrderWorkflowNodeResp[]
+  currentIndex: number
+  logs: OrderWorkflowLogResp[]
+  attachments: OrderAttachmentResp[]
+}
+const expandDataMap = ref<Record<number, ExpandData>>({})
 
 async function openDetailDialog(row: OrderResp) {
   detailDialogVisible.value = true
   detailLoading.value = true
-  detailTab.value = 'items'
-  detailLogs.value = []
+  expandedItemId.value = null
+  expandDataMap.value = {}
   try {
     const res = await getOrder(row.id)
     currentOrder.value = res.data.data
@@ -127,40 +134,76 @@ async function refreshDetail() {
   if (!currentOrder.value) return
   const res = await getOrder(currentOrder.value.id)
   currentOrder.value = res.data.data
-  detailLogs.value = []
 }
 
-async function loadDetailLogs() {
-  if (!currentOrder.value || !currentOrder.value.items) return
-  if (detailLogs.value.length > 0) return
-  detailLogsLoading.value = true
-  try {
-    const all: (OrderWorkflowLogResp & { product_name: string })[] = []
-    attachmentsMap.value = {}
-    for (const item of currentOrder.value.items) {
-      const [logRes, attRes] = await Promise.all([
-        getItemWorkflowLogs(currentOrder.value.id, item.id),
-        getItemAttachments(currentOrder.value.id, item.id),
-      ])
-      const logs = logRes.data.data || []
-      logs.forEach((log) => {
-        all.push({ ...log, order_item_id: item.id, product_name: item.product_name })
-      })
-      attachmentsMap.value[item.id] = attRes.data.data || []
-    }
-    all.sort((a, b) => (a.operated_at < b.operated_at ? 1 : -1))
-    detailLogs.value = all
-  } finally {
-    detailLogsLoading.value = false
-  }
+function handlePrintOrder() {
+  window.print()
 }
-
-const attachmentsMap = ref<Record<number, OrderAttachmentResp[]>>({})
 
 function getLogAttachments(itemId: number, workflowLogId: number | undefined): OrderAttachmentResp[] {
   if (!workflowLogId) return []
-  const list = attachmentsMap.value[itemId] || []
-  return list.filter((a) => a.workflow_log_id === workflowLogId)
+  const data = expandDataMap.value[itemId]
+  if (!data) return []
+  return data.attachments.filter((a: OrderAttachmentResp) => a.workflow_log_id === workflowLogId)
+}
+
+function getNodeLog(itemId: number, nodeIndex: number): OrderWorkflowLogResp | undefined {
+  const data = expandDataMap.value[itemId]
+  if (!data) return undefined
+  return data.logs.find((l: OrderWorkflowLogResp) => l.node_index === nodeIndex)
+}
+
+async function openInlineAdvance(item: OrderItemResp) {
+  if (!currentOrder.value) return
+  if (expandedItemId.value === item.id) {
+    expandedItemId.value = null
+    return
+  }
+  expandedItemId.value = item.id
+  advanceForm.notes = ''
+  advanceAttachments.value = []
+  advanceContext.value = { orderId: currentOrder.value.id, item }
+  const input = document.getElementById(ADVANCE_FILE_INPUT_ID) as HTMLInputElement | null
+  if (input) input.value = ''
+  expandLoading.value = true
+  try {
+    const orderId = currentOrder.value.id
+    const [wfRes, logRes, attRes] = await Promise.all([
+      getItemWorkflow(orderId, item.id),
+      getItemWorkflowLogs(orderId, item.id),
+      getItemAttachments(orderId, item.id),
+    ])
+    const wfData = wfRes.data.data as any
+    expandDataMap.value[item.id] = {
+      nodes: wfData?.nodes || [],
+      currentIndex: wfData?.current_node_index ?? -1,
+      logs: logRes.data.data || [],
+      attachments: attRes.data.data || [],
+    }
+  } finally {
+    expandLoading.value = false
+  }
+}
+
+function getCurrentNodeDetail(itemId: number): OrderWorkflowLogResp | undefined {
+  const data = expandDataMap.value[itemId]
+  if (!data) return undefined
+  const idx = data.currentIndex === -1 ? 0 : data.currentIndex
+  return data.logs.find((l: OrderWorkflowLogResp) => l.node_index === idx)
+}
+
+function getCompletedNodeLog(itemId: number, nodeIndex: number, currentIndex: number): OrderWorkflowLogResp | undefined {
+  if (nodeIndex > currentIndex) return undefined
+  const data = expandDataMap.value[itemId]
+  if (!data) return undefined
+  return data.logs.find((l: OrderWorkflowLogResp) => l.node_index === nodeIndex)
+}
+
+function getNodeAttachments(itemId: number, workflowLogId: number | undefined): OrderAttachmentResp[] {
+  if (!workflowLogId) return []
+  const data = expandDataMap.value[itemId]
+  if (!data) return []
+  return data.attachments.filter((a: OrderAttachmentResp) => a.workflow_log_id === workflowLogId)
 }
 
 async function handleDownloadAttachment(itemId: number, attId: number) {
@@ -175,29 +218,11 @@ async function handleDownloadAttachment(itemId: number, attId: number) {
   window.open(url, '_blank')
 }
 
-function handleDetailTabClick(tab: { props?: { name?: string } }) {
-  if (tab?.props?.name === 'logs') {
-    loadDetailLogs()
-  }
-}
-
-const advanceDialogVisible = ref(false)
 const advanceLoading = ref(false)
 const advanceForm = reactive({ notes: '' })
 const advanceAttachments = ref<UploadFile[]>([])
 const advanceContext = ref<{ orderId: number; item: OrderItemResp } | null>(null)
 const ADVANCE_FILE_INPUT_ID = 'advance-file-input'
-
-function openAdvanceDialog(item: OrderItemResp) {
-  if (!currentOrder.value) return
-  advanceContext.value = { orderId: currentOrder.value.id, item }
-  advanceForm.notes = ''
-  advanceAttachments.value = []
-  // Reset native input so picking the same file twice fires @change
-  const input = document.getElementById(ADVANCE_FILE_INPUT_ID) as HTMLInputElement | null
-  if (input) input.value = ''
-  advanceDialogVisible.value = true
-}
 
 function handleAdvanceFileInput(e: Event) {
   const input = e.target as HTMLInputElement
@@ -253,8 +278,27 @@ async function handleAdvanceSubmit() {
     }
     if (uploaded > 0) ElMessage.success(`已上传 ${uploaded} 个附件`)
     ElMessage.success('推进成功')
-    advanceDialogVisible.value = false
+    advanceForm.notes = ''
+    advanceAttachments.value = []
     await refreshDetail()
+    const updatedItem = currentOrder.value?.items?.find(i => i.id === item.id)
+    if (updatedItem && (updatedItem.item_status === 1 || updatedItem.item_status === 2)) {
+      advanceContext.value = { orderId, item: updatedItem }
+      const [wfRes, logRes, attRes] = await Promise.all([
+        getItemWorkflow(orderId, updatedItem.id),
+        getItemWorkflowLogs(orderId, updatedItem.id),
+        getItemAttachments(orderId, updatedItem.id),
+      ])
+      const wfData = wfRes.data.data as any
+      expandDataMap.value[updatedItem.id] = {
+        nodes: wfData?.nodes || [],
+        currentIndex: wfData?.current_node_index ?? -1,
+        logs: logRes.data.data || [],
+        attachments: attRes.data.data || [],
+      }
+    } else {
+      expandedItemId.value = null
+    }
   } finally {
     advanceLoading.value = false
   }
@@ -264,18 +308,6 @@ function formatFileSize(size: number): string {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(2)} MB`
-}
-
-async function handleCancelItem(item: OrderItemResp) {
-  if (!currentOrder.value) return
-  await ElMessageBox.confirm(
-    `确定要取消明细 ${item.product_name} 吗？`,
-    '取消确认',
-    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
-  )
-  await cancelOrderItem(currentOrder.value.id, item.id)
-  ElMessage.success('取消明细成功')
-  await refreshDetail()
 }
 
 async function handleCancelOrder(row: OrderResp) {
@@ -545,16 +577,18 @@ onMounted(() => {
     <el-dialog
       v-model="detailDialogVisible"
       :title="`订单详情 - ${currentOrder?.order_no || ''}`"
-      width="800px"
+      width="900px"
       :close-on-click-modal="false"
       destroy-on-close
     >
-      <div v-loading="detailLoading">
+      <div v-loading="detailLoading" id="order-print-area">
         <el-card v-if="currentOrder" shadow="never" class="detail-header">
           <el-descriptions :column="2" border size="small">
             <el-descriptions-item label="订单号">{{ currentOrder.order_no }}</el-descriptions-item>
             <el-descriptions-item label="客户">{{ currentOrder.customer_name }}</el-descriptions-item>
-            <el-descriptions-item label="金额">{{ formatAmount(currentOrder.total_amount) }}</el-descriptions-item>
+            <el-descriptions-item label="金额">
+              <span style="font-weight: 600; color: #f56c6c">{{ formatAmount(currentOrder.total_amount) }}</span>
+            </el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="orderStatusTagType(currentOrder.order_status)" size="small">
                 {{ orderStatusText(currentOrder.order_status) }}
@@ -570,171 +604,138 @@ onMounted(() => {
           </el-descriptions>
         </el-card>
 
-        <el-tabs v-if="currentOrder" v-model="detailTab" class="detail-tabs" @tab-click="handleDetailTabClick">
-          <el-tab-pane label="商品明细" name="items">
-            <el-table
-              v-if="currentOrder.items && currentOrder.items.length > 0"
-              :data="currentOrder.items"
-              border
-              stripe
-              style="width: 100%"
-            >
-              <el-table-column prop="product_name" label="商品名" min-width="160" />
-              <el-table-column prop="quantity" label="数量" width="80" align="center" />
-              <el-table-column label="单价" width="100" align="right">
-                <template #default="{ row }">
-                  {{ formatAmount(row.unit_price) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="小计" width="120" align="right">
-                <template #default="{ row }">
-                  {{ formatAmount(row.total_price) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="当前节点" min-width="120">
-                <template #default="{ row }">
-                  {{ row.current_node_name || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column label="状态" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag :type="itemStatusTagType(row.item_status)" size="small">
-                    {{ itemStatusText(row.item_status) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column label="操作" width="200" fixed="right">
-                <template #default="{ row }">
-                  <el-button
-                    v-permission="'shop:order:advance'"
-                    type="primary"
-                    link
-                    size="small"
-                    :disabled="!(row.item_status === 1 || row.item_status === 2) || !row.next_node_name"
-                    @click="openAdvanceDialog(row)"
-                  >
-                    推进流程
-                  </el-button>
-                  <el-button
-                    v-permission="'shop:order:cancel'"
-                    type="danger"
-                    link
-                    size="small"
-                    :disabled="!(row.item_status === 1 || row.item_status === 2)"
-                    @click="handleCancelItem(row)"
-                  >
-                    取消明细
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else description="暂无明细" />
-          </el-tab-pane>
-          <el-tab-pane label="流程跟进" name="logs">
-            <div v-loading="detailLogsLoading">
-              <el-table
-                v-if="detailLogs.length > 0"
-                :data="detailLogs"
-                border
-                stripe
-                style="width: 100%"
-              >
-                <el-table-column label="时间" min-width="170">
-                  <template #default="{ row }">
-                    {{ formatTime(row.operated_at) }}
-                  </template>
-                </el-table-column>
-                <el-table-column prop="product_name" label="商品" min-width="140" />
-                <el-table-column label="节点" min-width="160">
-                  <template #default="{ row }">
-                    <el-tag size="small">第{{ row.node_index }}步 · {{ row.node_name }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="notes" label="备注" min-width="180" show-overflow-tooltip />
-                <el-table-column label="操作人" min-width="120">
-                  <template #default="{ row }">
-                    {{ row.operator_name || row.operator_id || '-' }}
-                  </template>
-                </el-table-column>
-                <el-table-column label="附件" min-width="220">
-                  <template #default="{ row }">
-                    <template v-if="row.order_item_id && getLogAttachments(row.order_item_id, row.id).length > 0">
-                      <el-link
-                        v-for="att in getLogAttachments(row.order_item_id, row.id)"
-                        :key="att.id"
-                        type="primary"
-                        :underline="false"
-                        style="margin-right: 8px"
-                        @click="handleDownloadAttachment(row.order_item_id, att.id)"
-                      >
-                        <el-icon style="vertical-align: middle"><Document /></el-icon>
-                        <span style="margin-left: 2px">{{ att.file_name }}</span>
-                      </el-link>
-                    </template>
-                    <span v-else>-</span>
-                  </template>
-                </el-table-column>
-              </el-table>
-              <el-empty v-else description="暂无跟进记录" />
+        <div v-if="currentOrder && currentOrder.items && currentOrder.items.length > 0" style="margin-top: 20px">
+          <div class="product-section-title">商品服务明细</div>
+          <div v-for="item in currentOrder.items" :key="item.id" class="product-card">
+            <div class="product-card-header">
+              <div class="product-info">
+                <span class="product-name">{{ item.product_name }}</span>
+                <span class="product-meta">x{{ item.quantity }} · 单价 ¥{{ formatAmount(item.unit_price) }} · 小计 ¥{{ formatAmount(item.total_price) }}</span>
+              </div>
+              <div class="product-actions">
+                <el-tag :type="itemStatusTagType(item.item_status)" size="small">
+                  {{ itemStatusText(item.item_status) }}
+                </el-tag>
+                <el-button
+                  v-if="item.item_status === 1 || item.item_status === 2"
+                  v-permission="'shop:order:advance'"
+                  type="primary"
+                  size="small"
+                  plain
+                  @click="openInlineAdvance(item)"
+                >
+                  {{ expandedItemId === item.id ? '收起' : '推进流程' }}
+                </el-button>
+              </div>
             </div>
-          </el-tab-pane>
-        </el-tabs>
-      </div>
-      <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
-      </template>
-    </el-dialog>
 
-    <el-dialog
-      v-model="advanceDialogVisible"
-      title="推进流程"
-      width="520px"
-      :close-on-click-modal="false"
-      destroy-on-close
-    >
-      <el-form v-if="advanceContext" label-width="90px">
-        <el-form-item label="当前节点">
-          <el-tag size="small">{{ advanceContext.item.current_node_name || '-' }}</el-tag>
-        </el-form-item>
-        <el-form-item label="下一节点">
-          <el-tag size="small" type="success">{{ advanceContext.item.next_node_name || '已是最后节点' }}</el-tag>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input
-            v-model="advanceForm.notes"
-            type="textarea"
-            :rows="4"
-            placeholder="请填写本节点服务备注"
-          />
-        </el-form-item>
-        <el-form-item label="附件">
-          <!-- Native <label for> triggers file picker at browser level — no JS
-               click forwarding, no ref binding, no dialog stacking issue.         -->
-          <input
-            :id="ADVANCE_FILE_INPUT_ID"
-            type="file"
-            multiple
-            accept="*/*"
-            class="hidden-file-input"
-            @change="handleAdvanceFileInput"
-          />
-          <label :for="ADVANCE_FILE_INPUT_ID" class="el-button el-button--primary is-plain">
-            <el-icon style="margin-right: 4px;"><Plus /></el-icon>
-            选择文件
-          </label>
-          <span class="el-upload__tip" style="margin-left: 12px;">可上传多个文件，单个不超过 20MB（随流程记录一起提交）</span>
-          <div v-if="advanceAttachments.length" class="upload-list-preview">
-            <div v-for="f in advanceAttachments" :key="f.uid" class="upload-item">
-              <span class="upload-item-name">{{ f.name }}</span>
-              <span class="upload-item-size">{{ formatFileSize(f.size || 0) }}</span>
-              <el-button type="danger" link size="small" @click="removeAdvanceAttachment(f.uid)">移除</el-button>
+            <div v-if="expandedItemId === item.id" class="workflow-section" v-loading="expandLoading">
+              <template v-if="expandDataMap[item.id]">
+                <el-steps
+                  :active="expandDataMap[item.id].currentIndex === -1 ? 0 : expandDataMap[item.id].currentIndex"
+                  finish-status="success"
+                  align-center
+                  class="workflow-steps"
+                >
+                  <el-step
+                    v-for="node in expandDataMap[item.id].nodes"
+                    :key="node.node_index"
+                    :title="node.node_name"
+                  />
+                </el-steps>
+
+                <div class="completed-nodes-detail">
+                  <template v-for="node in expandDataMap[item.id].nodes" :key="'d_'+node.node_index">
+                    <div
+                      v-if="getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)"
+                      class="completed-node-item"
+                    >
+                      <div class="completed-node-header">
+                        <span class="completed-node-title">第{{ node.node_index }}步 · {{ node.node_name }}</span>
+                        <el-tag size="small" type="success">已完成</el-tag>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">操作人:</span>
+                        <span>{{ getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.operator_name || '-' }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">操作时间:</span>
+                        <span>{{ formatTime(getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.operated_at ?? null) }}</span>
+                      </div>
+                      <div v-if="getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.notes" class="detail-notes">
+                        {{ getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.notes }}
+                      </div>
+                      <div v-if="getNodeAttachments(item.id, getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.id).length" class="detail-attachments">
+                        <el-link
+                          v-for="att in getNodeAttachments(item.id, getCompletedNodeLog(item.id, node.node_index, expandDataMap[item.id].currentIndex)?.id)"
+                          :key="att.id"
+                          type="primary"
+                          :underline="false"
+                          style="margin-right: 12px"
+                          @click="handleDownloadAttachment(item.id, att.id)"
+                        >
+                          <el-icon style="vertical-align: middle"><Document /></el-icon>
+                          <span style="margin-left: 2px">{{ att.file_name }}</span>
+                        </el-link>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+
+                <div
+                  v-if="item.item_status === 1 || item.item_status === 2"
+                  class="inline-advance-form"
+                >
+                  <div class="form-title">推进当前节点</div>
+                  <div class="form-row">
+                    <span class="form-label">当前:</span>
+                    <el-tag size="small">{{ item.current_node_name || '起始' }}</el-tag>
+                    <span style="margin: 0 8px">→</span>
+                    <span class="form-label">下一步:</span>
+                    <el-tag size="small" type="success">{{ item.next_node_name || '完成' }}</el-tag>
+                  </div>
+                  <el-input
+                    v-model="advanceForm.notes"
+                    type="textarea"
+                    :rows="3"
+                    placeholder="请填写本节点服务备注"
+                    style="margin-top: 12px"
+                  />
+                  <div class="form-upload-row">
+                    <input
+                      :id="ADVANCE_FILE_INPUT_ID"
+                      type="file"
+                      multiple
+                      accept="*/*"
+                      class="hidden-file-input"
+                      @change="handleAdvanceFileInput"
+                    />
+                    <label :for="ADVANCE_FILE_INPUT_ID" class="el-button el-button--primary is-plain" style="display: inline-flex; align-items: center; cursor: pointer">
+                      <el-icon style="margin-right: 4px;"><Plus /></el-icon>
+                      选择文件
+                    </label>
+                    <span style="margin-left: 8px; font-size: 12px; color: #909399">可上传多个，单个不超过 20MB</span>
+                  </div>
+                  <div v-if="advanceAttachments.length" class="upload-list-preview">
+                    <div v-for="f in advanceAttachments" :key="f.uid" class="upload-item">
+                      <span class="upload-item-name">{{ f.name }}</span>
+                      <span class="upload-item-size">{{ formatFileSize(f.size || 0) }}</span>
+                      <el-button type="danger" link size="small" @click="removeAdvanceAttachment(f.uid)">移除</el-button>
+                    </div>
+                  </div>
+                  <div style="text-align: right; margin-top: 12px">
+                    <el-button type="primary" :loading="advanceLoading" @click="handleAdvanceSubmit">提交推进</el-button>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
-        </el-form-item>
-      </el-form>
+        </div>
+        <el-empty v-else-if="!detailLoading && currentOrder" description="暂无商品明细" />
+      </div>
       <template #footer>
-        <el-button @click="advanceDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="advanceLoading" @click="handleAdvanceSubmit">推进</el-button>
+        <el-button @click="handlePrintOrder">打印</el-button>
+        <el-button @click="detailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -861,20 +862,182 @@ onMounted(() => {
 .search-card :deep(.el-card__body) { padding-bottom: 2px; }
 .table-header { margin-bottom: 16px; display: flex; gap: 8px; }
 .pagination-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
-.detail-header { margin-bottom: 16px; }
-.detail-tabs { margin-top: 8px; }
+.detail-header { margin-bottom: 0; }
 .total-amount { font-size: 18px; font-weight: 600; color: #f56c6c; }
 .picker-search { margin-bottom: 12px; }
+
+.product-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+  padding-left: 8px;
+  border-left: 3px solid var(--el-color-primary);
+}
+
+.product-card {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: #fff;
+  transition: box-shadow 0.2s;
+}
+.product-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.product-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.product-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+.product-meta {
+  font-size: 13px;
+  color: #909399;
+}
+.product-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.workflow-steps {
+  margin-bottom: 20px;
+}
+.workflow-steps :deep(.el-step__title) {
+  font-size: 13px;
+}
+
+.completed-nodes-detail {
+  margin-bottom: 16px;
+}
+.completed-node-item {
+  background: #f0f9eb;
+  border: 1px solid #e1f3d8;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+.completed-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.completed-node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #67c23a;
+}
+
+.current-node-detail {
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.detail-row {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 4px;
+}
+.detail-label {
+  color: #909399;
+  margin-right: 4px;
+}
+.detail-notes {
+  font-size: 13px;
+  color: #303133;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid #ebeef5;
+}
+.detail-attachments {
+  margin-top: 8px;
+}
+
+.inline-advance-form {
+  background: #ecf5ff;
+  border-radius: 6px;
+  padding: 16px;
+  border: 1px solid #d9ecff;
+}
+.form-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-bottom: 12px;
+}
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #606266;
+}
+.form-label {
+  color: #909399;
+}
+.form-upload-row {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
 .upload-list-preview { margin-top: 8px; }
 .upload-item { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; color: #606266; }
 .upload-item-name { color: #409eff; }
 .upload-item-size { color: #909399; }
-/* Hidden file input — triggered by <label for> at browser level, no JS needed */
+
 .hidden-file-input {
   position: absolute;
   width: 0;
   height: 0;
   opacity: 0;
   pointer-events: none;
+}
+</style>
+
+<style>
+@media print {
+  /* 隐藏侧边栏、顶栏 */
+  .layout-aside,
+  .layout-header { display: none !important; }
+  /* 父容器取消固定高度，避免撑出空白页 */
+  body, #app, .layout-container, .layout-main { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+  /* 隐藏订单列表搜索和表格区域 */
+  .search-card,
+  .table-card { display: none !important; }
+  /* 去掉遮罩层背景，全部 static 布局 */
+  .el-overlay { background: none !important; position: static !important; overflow: visible !important; }
+  .el-overlay-dialog { position: static !important; height: auto !important; overflow: visible !important; }
+  /* 对话框全宽展示 */
+  .el-dialog { position: static !important; width: 100% !important; max-width: 100% !important; margin: 0 !important; box-shadow: none !important; }
+  .el-dialog__header { display: none !important; }
+  .el-dialog__body { padding: 20px !important; }
+  .el-dialog__footer { display: none !important; }
+  /* 隐藏操作类元素 */
+  .inline-advance-form,
+  .el-button { display: none !important; }
+  .product-card { break-inside: avoid; }
 }
 </style>
