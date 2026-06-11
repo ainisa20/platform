@@ -1,7 +1,10 @@
 package shop
 
 import (
+	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"platform/internal/model/dto"
@@ -230,6 +233,55 @@ func (ctrl *RecordCtrl) Export(c *gin.Context) {
 		return
 	}
 	response.OK(c, list)
+}
+
+func (ctrl *RecordCtrl) ExportZip(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
+	userID := c.GetUint64("user_id")
+
+	var req dto.FinanceRecordListReq
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	task, err := ctrl.svc.CreateExportTask(db, tenantID, userID, &req)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.OK(c, task)
+}
+
+func (ctrl *RecordCtrl) GetExportTask(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
+	taskID, _ := strconv.ParseUint(c.Param("task_id"), 10, 64)
+
+	task, err := ctrl.svc.GetExportTask(db, taskID, tenantID)
+	if err != nil {
+		response.NotFound(c, "导出任务不存在")
+		return
+	}
+	response.OK(c, task)
+}
+
+func (ctrl *RecordCtrl) DownloadExport(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+	tenantID := c.GetUint64("tenant_id")
+	taskID, _ := strconv.ParseUint(c.Param("task_id"), 10, 64)
+
+	info, err := ctrl.svc.DownloadExportFile(db, taskID, tenantID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	defer info.Reader.Close()
+
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, info.FileName, url.PathEscape(info.FileName)))
+	io.Copy(c.Writer, info.Reader)
 }
 
 func handleRecordError(c *gin.Context, err error) {

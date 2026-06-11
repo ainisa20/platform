@@ -100,7 +100,7 @@ func main() {
 	shopProductService := shopsvc.NewShopProductService(shopProductRepo, platProductRepo, platCategoryRepo)
 	shopCustomerService := shopsvc.NewShopCustomerService(shopCustomerRepo)
 	shopOrderService := shopsvc.NewOrderService(shopOrderRepo, shopCustomerRepo, shopProductRepo, platProductRepo, platWorkflowRepo, shopUserRepo, minioStorage)
-	shopRecordService := shopsvc.NewRecordService(shopRecordRepo, shopFinAccountRepo, shopFinCatRepo, shopOrderRepo, shopUserRepo, minioStorage)
+	shopRecordService := shopsvc.NewRecordService(shopRecordRepo, shopFinAccountRepo, shopFinCatRepo, shopOrderRepo, shopUserRepo, minioStorage, cfg.Database.DSN())
 
 	// Auth is shared (both endpoints use the same login service)
 	authService := service.NewAuthService(authRepo, rdb, cfg)
@@ -227,10 +227,12 @@ func autoMigrate(db *gorm.DB) error {
 		&entity.ShopCustomer{},
 		&entity.OrderGroup{},
 		&entity.OrderItem{},
+		&entity.OrderItemNode{},
 		&entity.OrderWorkflowLog{},
 		&entity.OrderAttachment{},
 		&entity.FinanceRecord{},
 		&entity.FinanceAttachment{},
+		&entity.ExportTask{},
 	)
 }
 

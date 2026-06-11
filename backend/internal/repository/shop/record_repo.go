@@ -15,6 +15,7 @@ type RecordRepository interface {
 	Update(db *gorm.DB, r *entity.FinanceRecord) error
 	Delete(db *gorm.DB, id uint64) error
 	ListAttachments(db *gorm.DB, recordID uint64) ([]entity.FinanceAttachment, error)
+	ListAttachmentsByRecordIDs(db *gorm.DB, recordIDs []uint64) ([]entity.FinanceAttachment, error)
 	GetAttachment(db *gorm.DB, id uint64) (*entity.FinanceAttachment, error)
 	CreateAttachment(db *gorm.DB, a *entity.FinanceAttachment) error
 }
@@ -36,6 +37,9 @@ func (r *recordRepository) List(db *gorm.DB, tenantID uint64, req *dto.FinanceRe
 	if req.AccountID != nil {
 		q = q.Where("account_id = ?", *req.AccountID)
 	}
+	if req.AccountType != nil {
+		q = q.Where("account_type = ?", *req.AccountType)
+	}
 	if req.CategoryID != nil {
 		q = q.Where("category_id = ?", *req.CategoryID)
 	}
@@ -44,6 +48,15 @@ func (r *recordRepository) List(db *gorm.DB, tenantID uint64, req *dto.FinanceRe
 	}
 	if req.ReviewStatus != nil {
 		q = q.Where("review_status = ?", *req.ReviewStatus)
+	}
+	if req.RecordDateStart != "" {
+		q = q.Where("record_date >= ?", req.RecordDateStart)
+	}
+	if req.RecordDateEnd != "" {
+		q = q.Where("record_date <= ?", req.RecordDateEnd)
+	}
+	if req.CreatedBy != nil {
+		q = q.Where("created_by = ?", *req.CreatedBy)
 	}
 
 	if err := q.Count(&total).Error; err != nil {
@@ -100,6 +113,18 @@ func (r *recordRepository) ListAttachments(db *gorm.DB, recordID uint64) ([]enti
 	var atts []entity.FinanceAttachment
 	if err := db.Where("finance_record_id = ? AND deleted_at IS NULL", recordID).
 		Order("id DESC").Find(&atts).Error; err != nil {
+		return nil, err
+	}
+	return atts, nil
+}
+
+func (r *recordRepository) ListAttachmentsByRecordIDs(db *gorm.DB, recordIDs []uint64) ([]entity.FinanceAttachment, error) {
+	if len(recordIDs) == 0 {
+		return nil, nil
+	}
+	var atts []entity.FinanceAttachment
+	if err := db.Where("finance_record_id IN ? AND deleted_at IS NULL", recordIDs).
+		Order("id ASC").Find(&atts).Error; err != nil {
 		return nil, err
 	}
 	return atts, nil

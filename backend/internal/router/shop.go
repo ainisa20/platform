@@ -126,8 +126,11 @@ func RegisterShopRoutes(
 		middleware.DataScopeMiddleware(db),
 	)
 	{
-		records.GET("/export", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.Export)
-		records.GET("", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.List)
+	records.GET("/export", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.Export)
+	records.GET("/export-zip", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.ExportZip)
+	records.GET("/export-zip/:task_id", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.GetExportTask)
+	records.GET("/export-zip/:task_id/download", middleware.PermissionMiddleware("shop:finance:record:export"), recordCtrl.DownloadExport)
+	records.GET("", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.List)
 		records.GET("/:id", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.Get)
 		records.GET("/:id/attachments", middleware.PermissionMiddleware("shop:finance:record:list"), recordCtrl.ListAttachments)
 		records.POST("", middleware.PermissionMiddleware("shop:finance:record:create"), recordCtrl.Create)

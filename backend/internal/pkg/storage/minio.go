@@ -48,6 +48,14 @@ func (s *MinIOStorage) Upload(ctx context.Context, bucket, objectName string, re
 	return err
 }
 
+func (s *MinIOStorage) GetObject(ctx context.Context, bucket, objectName string) (io.ReadCloser, error) {
+	obj, err := s.client.GetObject(ctx, bucket, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get object failed: %w", err)
+	}
+	return obj, nil
+}
+
 func (s *MinIOStorage) GetDownloadURL(ctx context.Context, bucket, objectName string, expiry time.Duration) (string, error) {
 	reqParams := make(url.Values)
 	reqParams.Set("response-content-disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(objectName)))

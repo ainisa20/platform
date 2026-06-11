@@ -65,6 +65,7 @@ var ShopManifest = Manifest{
 					{Name: "审核", Code: "shop:finance:record:audit"},
 					{Name: "上传附件", Code: "shop:finance:record:upload"},
 					{Name: "导出", Code: "shop:finance:record:export"},
+					{Name: "导出附件", Code: "shop:finance:record:export-zip"},
 				}},
 			{Name: "财务报表", Type: enum.PermTypeMenu, Path: "/finance/report",
 				Component: "shop/finance/report/index", Sort: 4,
