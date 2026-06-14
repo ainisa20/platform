@@ -15,15 +15,18 @@ import (
 type ProductService struct {
 	productRepo  platform.ProductRepository
 	workflowRepo platform.WorkflowRepository
+	catRepo      platform.CategoryRepository
 }
 
 func NewProductService(
 	productRepo platform.ProductRepository,
 	workflowRepo platform.WorkflowRepository,
+	catRepo platform.CategoryRepository,
 ) *ProductService {
 	return &ProductService{
 		productRepo:  productRepo,
 		workflowRepo: workflowRepo,
+		catRepo:      catRepo,
 	}
 }
 
@@ -32,9 +35,50 @@ func (s *ProductService) List(db *gorm.DB, req *dto.ProductListReq) ([]dto.Produ
 	if err != nil {
 		return nil, 0, err
 	}
+
+	catMap := make(map[uint64]string)
+	userMap := make(map[uint64]string)
+
+	for i := range products {
+		if products[i].CategoryID != nil {
+			catMap[*products[i].CategoryID] = ""
+		}
+		if products[i].CreatedBy != 0 {
+			userMap[products[i].CreatedBy] = ""
+		}
+	}
+
+	if len(catMap) > 0 {
+		ids := make([]uint64, 0, len(catMap))
+		for id := range catMap {
+			ids = append(ids, id)
+		}
+		cats, _, _ := s.catRepo.List(db, &dto.CategoryListReq{PageSize: 10000})
+		for _, c := range cats {
+			catMap[c.ID] = c.CategoryName
+		}
+	}
+
+	if len(userMap) > 0 {
+		ids := make([]uint64, 0, len(userMap))
+		for id := range userMap {
+			ids = append(ids, id)
+		}
+		var users []entity.SysUser
+		db.Where("id IN ?", ids).Find(&users)
+		for _, u := range users {
+			userMap[u.ID] = u.RealName
+		}
+	}
+
 	resps := make([]dto.ProductResp, 0, len(products))
 	for i := range products {
-		resps = append(resps, s.productToResp(&products[i]))
+		resp := s.productToResp(&products[i])
+		if resp.CategoryID != nil {
+			resp.CategoryName = catMap[*resp.CategoryID]
+		}
+		resp.CreatedByName = userMap[resp.CreatedBy]
+		resps = append(resps, resp)
 	}
 	return resps, total, nil
 }

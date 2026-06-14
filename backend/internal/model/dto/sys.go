@@ -337,6 +337,7 @@ type ProductResp struct {
 	ProductCode     string            `json:"product_code"`
 	ProductName     string            `json:"product_name"`
 	CategoryID      *uint64           `json:"category_id"`
+	CategoryName    string            `json:"category_name"`
 	Price           float64           `json:"price"`
 	Sort            int16             `json:"sort"`
 	Status          int16             `json:"status"`
@@ -344,6 +345,7 @@ type ProductResp struct {
 	Description     string            `json:"description"`
 	CreatedAt       time.Time         `json:"created_at"`
 	CreatedBy       uint64            `json:"created_by"`
+	CreatedByName   string            `json:"created_by_name"`
 	UpdatedAt       time.Time         `json:"updated_at"`
 	UpdatedBy       uint64            `json:"updated_by"`
 	WorkflowNodes   []WorkflowNodeResp `json:"workflow_nodes,omitempty"`

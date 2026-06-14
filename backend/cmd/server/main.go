@@ -88,7 +88,7 @@ func main() {
 	platDeptService := platformsvc.NewDeptService(platDeptRepo, platUserRepo)
 	platShopService := platformsvc.NewShopService(platShopRepo, platUserRepo, platRoleRepo, platDeptRepo)
 	platCategoryService := platformsvc.NewCategoryService(platCategoryRepo)
-	platProductService := platformsvc.NewProductService(platProductRepo, platWorkflowRepo)
+	platProductService := platformsvc.NewProductService(platProductRepo, platWorkflowRepo, platCategoryRepo)
 	platFinCatService := platformsvc.NewFinanceCategoryService(platFinCatRepo)
 
 	// Shop-side services
