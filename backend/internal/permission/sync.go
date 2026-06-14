@@ -113,8 +113,8 @@ func upsertNode(db *gorm.DB, rec entity.SysPermission) (uint64, error) {
 	var existing entity.SysPermission
 
 	if rec.PermsCode == "" {
-		result := db.Where("system_type = ? AND path = ? AND perms_code = '' AND parent_id = ?",
-			rec.SystemType, rec.Path, rec.ParentID).First(&existing)
+		result := db.Where("system_type = ? AND parent_id = ? AND type = ? AND name = ? AND perms_code = ''",
+			rec.SystemType, rec.ParentID, rec.Type, rec.Name).First(&existing)
 
 		if result.Error == gorm.ErrRecordNotFound {
 			if err := db.Create(&rec).Error; err != nil {
