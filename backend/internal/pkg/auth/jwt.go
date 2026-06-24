@@ -14,11 +14,11 @@ import (
 
 // JWTClaims represents the JWT payload for authenticated users.
 type JWTClaims struct {
-	UserID   uint64 `json:"user_id"`
-	TenantID uint64 `json:"tenant_id"`
-	DeptID   uint64 `json:"dept_id"`
-	Username string `json:"username"`
-	DataScope int16 `json:"data_scope"`
+	UserID    uint64 `json:"user_id"`
+	TenantID  uint64 `json:"tenant_id"`
+	DeptID    uint64 `json:"dept_id"`
+	Username  string `json:"username"`
+	DataScope int16  `json:"data_scope"`
 	jwt.RegisteredClaims
 }
 

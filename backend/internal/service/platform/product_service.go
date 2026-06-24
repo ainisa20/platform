@@ -116,6 +116,7 @@ func (s *ProductService) Create(db *gorm.DB, createdBy uint64, req *dto.ProductC
 		ProductName:     req.ProductName,
 		CategoryID:      req.CategoryID,
 		Price:           req.Price,
+		Unit:            req.Unit,
 		Sort:            req.Sort,
 		Status:          status,
 		MallProductCode: req.MallProductCode,
@@ -165,6 +166,7 @@ func (s *ProductService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.Prod
 	product.ProductName = req.ProductName
 	product.CategoryID = req.CategoryID
 	product.Price = req.Price
+	product.Unit = req.Unit
 	product.Sort = req.Sort
 	product.Status = req.Status
 	product.MallProductCode = req.MallProductCode
@@ -256,6 +258,7 @@ func (s *ProductService) productToResp(p *entity.Product) dto.ProductResp {
 		ProductName:     p.ProductName,
 		CategoryID:      p.CategoryID,
 		Price:           p.Price,
+		Unit:            p.Unit,
 		Sort:            p.Sort,
 		Status:          p.Status,
 		MallProductCode: p.MallProductCode,

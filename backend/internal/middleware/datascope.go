@@ -14,9 +14,9 @@ import (
 //
 //   - DataScopeAll (1):        user_ids = nil (no filter); dept_ids = nil
 //   - DataScopeDeptAndSub (2): user_ids = users in dept + descendants;
-//                              dept_ids = dept + descendants
+//     dept_ids = dept + descendants
 //   - DataScopeDeptOnly (3):   user_ids = users in dept only;
-//                              dept_ids = dept only
+//     dept_ids = dept only
 //   - DataScopeSelfOnly (4):   user_ids = [self]; dept_ids = [self dept]
 //
 // Downstream controllers should call ApplyUserScope(db), ApplyDeptScope(db),

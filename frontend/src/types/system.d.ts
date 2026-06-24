@@ -281,6 +281,7 @@ export interface ProductResp {
   category_id: number
   category_name?: string
   price: number
+  unit?: string
   sort: number
   status: number
   description: string
@@ -303,6 +304,7 @@ export interface ProductCreateReq {
   product_name: string
   category_id?: number
   price: number
+  unit?: string
   sort?: number
   status?: number
   description?: string
@@ -313,6 +315,7 @@ export interface ProductUpdateReq {
   product_name?: string
   category_id?: number
   price?: number
+  unit?: string
   sort?: number
   status?: number
   description?: string
@@ -517,6 +520,7 @@ export interface OrderCreateReq {
   customer_id: number
   remark?: string
   items: OrderItemReq[]
+  discount_amount?: number
 }
 
 export interface OrderListReq extends PageReq {
@@ -547,6 +551,8 @@ export interface OrderResp {
   customer_id: number
   customer_name: string
   total_amount: number
+  discount_amount: number
+  payable_amount: number
   order_status: number
   remark: string
   item_count: number
@@ -643,7 +649,7 @@ export interface ShopFinAccountUpdateReq {
 // ==================== 店铺收支记录 ====================
 
 export interface FinanceRecordCreateReq {
-  account_id: number
+  account_id?: number
   category_id: number
   record_type: number
   amount: number
@@ -653,7 +659,7 @@ export interface FinanceRecordCreateReq {
 }
 
 export interface FinanceRecordUpdateReq {
-  account_id: number
+  account_id?: number
   category_id: number
   record_type: number
   amount: number
@@ -680,6 +686,7 @@ export interface FinanceRecordListReq extends PageReq {
 export interface FinanceReviewReq {
   action: 'approve' | 'reject'
   actual_amount?: number
+  account_id?: number
   notes?: string
 }
 

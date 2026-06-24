@@ -102,6 +102,7 @@ interface ProductFormData {
   product_name: string
   category_id: number | undefined
   price: number | undefined
+  unit: string
   sort: number | undefined
   status: number
   description: string
@@ -112,6 +113,7 @@ const defaultForm = (): ProductFormData => ({
   product_name: '',
   category_id: undefined,
   price: undefined,
+  unit: '',
   sort: undefined,
   status: 1,
   description: '',
@@ -168,6 +170,7 @@ function openEditDialog(row: ProductResp) {
     product_name: row.product_name,
     category_id: row.category_id,
     price: row.price,
+    unit: row.unit || '',
     sort: row.sort,
     status: row.status,
     description: row.description,
@@ -203,6 +206,7 @@ async function handleSubmit() {
         product_name: formData.product_name,
         category_id: formData.category_id,
         price: formData.price,
+        unit: formData.unit || undefined,
         sort: formData.sort,
         status: formData.status,
         description: formData.description || undefined,
@@ -215,6 +219,7 @@ async function handleSubmit() {
         product_name: formData.product_name,
         category_id: formData.category_id,
         price: formData.price ?? 0,
+        unit: formData.unit || undefined,
         sort: formData.sort,
         status: formData.status,
         description: formData.description || undefined,
@@ -396,19 +401,20 @@ onMounted(() => {
       </div>
 
       <el-table v-loading="loading" :data="tableData" border stripe style="width: 100%">
-        <el-table-column prop="product_code" label="商品编号" min-width="130" />
-        <el-table-column prop="product_name" label="商品名称" min-width="140" />
+        <el-table-column prop="sort" label="排序" width="80" align="center" />
         <el-table-column label="分类" min-width="120">
           <template #default="{ row }">
             {{ row.category_name || '-' }}
           </template>
         </el-table-column>
+        <el-table-column prop="product_code" label="商品编号" min-width="130" />
+        <el-table-column prop="product_name" label="商品名称" min-width="140" />
         <el-table-column label="标准价格" min-width="110" align="right">
           <template #default="{ row }">
             {{ formatPrice(row.price) }}
           </template>
         </el-table-column>
-        <el-table-column prop="sort" label="排序" width="80" align="center" />
+        <el-table-column prop="unit" label="单位" min-width="80" />
         <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" size="small">
@@ -490,6 +496,9 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="标准价格" prop="price">
           <el-input-number v-model="formData.price" :precision="2" :min="0" :step="100" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="单位" prop="unit">
+          <el-input v-model="formData.unit" placeholder="请输入单位，如：个、套、月、年" />
         </el-form-item>
         <el-form-item label="排序" prop="sort">
           <el-input-number v-model="formData.sort" :min="0" style="width: 100%" />

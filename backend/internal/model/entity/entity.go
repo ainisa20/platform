@@ -17,23 +17,23 @@ type Model struct {
 }
 
 type SysUser struct {
-	ID           uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
-	TenantID     uint64         `gorm:"not null;default:0;index" json:"tenant_id"`
-	DeptID       *uint64        `gorm:"index" json:"dept_id"`
-	Username     string         `gorm:"type:varchar(64);not null" json:"username"`
-	Password     string         `gorm:"type:varchar(255);not null" json:"-"`
-	RealName     string         `gorm:"type:varchar(64);not null" json:"real_name"`
-	Phone        string         `gorm:"type:varchar(20)" json:"phone"`
-	Email        string         `gorm:"type:varchar(128)" json:"email"`
-	Avatar       string         `gorm:"type:varchar(500)" json:"avatar"`
-	Status       int16          `gorm:"default:1" json:"status"`
-	LastLoginAt  *time.Time     `json:"last_login_at"`
-	LastLoginIP  string         `gorm:"type:varchar(45)" json:"last_login_ip"`
-	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy    uint64         `json:"created_by"`
-	UpdatedAt    time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	UpdatedBy    uint64         `json:"updated_by"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	ID          uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
+	TenantID    uint64         `gorm:"not null;default:0;index" json:"tenant_id"`
+	DeptID      *uint64        `gorm:"index" json:"dept_id"`
+	Username    string         `gorm:"type:varchar(64);not null" json:"username"`
+	Password    string         `gorm:"type:varchar(255);not null" json:"-"`
+	RealName    string         `gorm:"type:varchar(64);not null" json:"real_name"`
+	Phone       string         `gorm:"type:varchar(20)" json:"phone"`
+	Email       string         `gorm:"type:varchar(128)" json:"email"`
+	Avatar      string         `gorm:"type:varchar(500)" json:"avatar"`
+	Status      int16          `gorm:"default:1" json:"status"`
+	LastLoginAt *time.Time     `json:"last_login_at"`
+	LastLoginIP string         `gorm:"type:varchar(45)" json:"last_login_ip"`
+	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	CreatedBy   uint64         `json:"created_by"`
+	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedBy   uint64         `json:"updated_by"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 func (SysUser) TableName() string { return "sys_user" }
@@ -57,20 +57,20 @@ type SysRole struct {
 func (SysRole) TableName() string { return "sys_role" }
 
 type SysPermission struct {
-	ID         uint64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	ParentID   uint64     `gorm:"default:0" json:"parent_id"`
-	SystemType string     `gorm:"type:varchar(16);not null" json:"system_type"`
-	Name       string     `gorm:"type:varchar(64);not null" json:"name"`
-	Type       int16      `gorm:"not null" json:"type"`
-	Path       string     `gorm:"type:varchar(255)" json:"path"`
-	Component  string     `gorm:"type:varchar(255)" json:"component"`
-	PermsCode  string     `gorm:"type:varchar(100)" json:"perms_code"`
-	Icon       string     `gorm:"type:varchar(64)" json:"icon"`
-	Sort       int16      `gorm:"default:0" json:"sort"`
-	Visible    bool       `gorm:"default:true" json:"visible"`
-	Status     int16      `gorm:"default:1" json:"status"`
-	AutoSynced bool       `gorm:"default:true" json:"auto_synced"`
-	UpdatedAt  time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID         uint64    `gorm:"primaryKey;autoIncrement" json:"id"`
+	ParentID   uint64    `gorm:"default:0" json:"parent_id"`
+	SystemType string    `gorm:"type:varchar(16);not null" json:"system_type"`
+	Name       string    `gorm:"type:varchar(64);not null" json:"name"`
+	Type       int16     `gorm:"not null" json:"type"`
+	Path       string    `gorm:"type:varchar(255)" json:"path"`
+	Component  string    `gorm:"type:varchar(255)" json:"component"`
+	PermsCode  string    `gorm:"type:varchar(100)" json:"perms_code"`
+	Icon       string    `gorm:"type:varchar(64)" json:"icon"`
+	Sort       int16     `gorm:"default:0" json:"sort"`
+	Visible    bool      `gorm:"default:true" json:"visible"`
+	Status     int16     `gorm:"default:1" json:"status"`
+	AutoSynced bool      `gorm:"default:true" json:"auto_synced"`
+	UpdatedAt  time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (SysPermission) TableName() string { return "sys_permission" }
@@ -138,26 +138,26 @@ type SysOperationLog struct {
 func (SysOperationLog) TableName() string { return "sys_operation_log" }
 
 type SysShop struct {
-	ID         uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
-	ShopCode   string         `gorm:"type:varchar(32);uniqueIndex;not null" json:"shop_code"`
-	ShopName   string         `gorm:"type:varchar(64);not null" json:"shop_name"`
-	Contact        string         `gorm:"type:varchar(64)" json:"contact"`
-	Phone          string         `gorm:"type:varchar(20)" json:"phone"`
-	Email          string         `gorm:"type:varchar(128)" json:"email"`
-	Province       string         `gorm:"type:varchar(32)" json:"province"`
-	City           string         `gorm:"type:varchar(32)" json:"city"`
-	District       string         `gorm:"type:varchar(32)" json:"district"`
-	DetailAddress  string         `gorm:"type:varchar(255)" json:"detail_address"`
-	Address        string         `gorm:"type:varchar(255)" json:"address"`
-	Remark     string         `gorm:"type:varchar(500)" json:"remark"`
-	Status     int16          `gorm:"default:1" json:"status"`
-	AdminUserID *uint64       `json:"admin_user_id"`
-	ExpiresAt  *time.Time     `json:"expires_at"`
-	CreatedAt  time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy  uint64         `json:"created_by"`
-	UpdatedAt  time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	UpdatedBy  uint64         `json:"updated_by"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	ID            uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
+	ShopCode      string         `gorm:"type:varchar(32);uniqueIndex;not null" json:"shop_code"`
+	ShopName      string         `gorm:"type:varchar(64);not null" json:"shop_name"`
+	Contact       string         `gorm:"type:varchar(64)" json:"contact"`
+	Phone         string         `gorm:"type:varchar(20)" json:"phone"`
+	Email         string         `gorm:"type:varchar(128)" json:"email"`
+	Province      string         `gorm:"type:varchar(32)" json:"province"`
+	City          string         `gorm:"type:varchar(32)" json:"city"`
+	District      string         `gorm:"type:varchar(32)" json:"district"`
+	DetailAddress string         `gorm:"type:varchar(255)" json:"detail_address"`
+	Address       string         `gorm:"type:varchar(255)" json:"address"`
+	Remark        string         `gorm:"type:varchar(500)" json:"remark"`
+	Status        int16          `gorm:"default:1" json:"status"`
+	AdminUserID   *uint64        `json:"admin_user_id"`
+	ExpiresAt     *time.Time     `json:"expires_at"`
+	CreatedAt     time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	CreatedBy     uint64         `json:"created_by"`
+	UpdatedAt     time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedBy     uint64         `json:"updated_by"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 func (SysShop) TableName() string { return "sys_shop" }
@@ -180,20 +180,21 @@ type ProductCategory struct {
 func (ProductCategory) TableName() string { return "product_category" }
 
 type Product struct {
-	ID             uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
-	ProductCode    string         `gorm:"type:varchar(64);uniqueIndex;not null" json:"product_code"`
-	ProductName    string         `gorm:"type:varchar(128);not null" json:"product_name"`
-	CategoryID     *uint64        `gorm:"index" json:"category_id"`
-	Price          float64        `gorm:"type:numeric(12,2);not null" json:"price"`
-	Sort           int16          `gorm:"default:0" json:"sort"`
-	Status         int16          `gorm:"default:1" json:"status"`
-	MallProductCode string        `gorm:"type:varchar(64)" json:"mall_product_code"`
-	Description    string         `gorm:"type:text" json:"description"`
-	CreatedAt      time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy      uint64         `json:"created_by"`
-	UpdatedAt      time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	UpdatedBy      uint64         `json:"updated_by"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	ID              uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
+	ProductCode     string         `gorm:"type:varchar(64);uniqueIndex;not null" json:"product_code"`
+	ProductName     string         `gorm:"type:varchar(128);not null" json:"product_name"`
+	CategoryID      *uint64        `gorm:"index" json:"category_id"`
+	Price           float64        `gorm:"type:numeric(12,2);not null" json:"price"`
+	Unit            string         `gorm:"type:varchar(32);default:''" json:"unit"`
+	Sort            int16          `gorm:"default:0" json:"sort"`
+	Status          int16          `gorm:"default:1" json:"status"`
+	MallProductCode string         `gorm:"type:varchar(64)" json:"mall_product_code"`
+	Description     string         `gorm:"type:text" json:"description"`
+	CreatedAt       time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	CreatedBy       uint64         `json:"created_by"`
+	UpdatedAt       time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedBy       uint64         `json:"updated_by"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 func (Product) TableName() string { return "product" }
@@ -305,19 +306,21 @@ type ShopCustomer struct {
 func (ShopCustomer) TableName() string { return "shop_customer" }
 
 type OrderGroup struct {
-	ID           uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
-	TenantID     uint64         `gorm:"not null;index" json:"tenant_id"`
-	OrderNo      string         `gorm:"type:varchar(64);uniqueIndex" json:"order_no"`
-	CustomerID   uint64         `gorm:"not null;index" json:"customer_id"`
-	CustomerName string         `gorm:"type:varchar(128)" json:"customer_name"`
-	TotalAmount  float64        `gorm:"type:numeric(12,2);not null" json:"total_amount"`
-	OrderStatus  int16          `gorm:"default:1" json:"order_status"`
-	Remark       string         `gorm:"type:varchar(500)" json:"remark"`
-	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"created_at"`
-	CreatedBy    uint64         `gorm:"index" json:"created_by"`
-	UpdatedAt    time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
-	UpdatedBy    uint64         `json:"updated_by"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at"`
+	ID             uint64         `gorm:"primaryKey;autoIncrement" json:"id"`
+	TenantID       uint64         `gorm:"not null;index" json:"tenant_id"`
+	OrderNo        string         `gorm:"type:varchar(64);uniqueIndex" json:"order_no"`
+	CustomerID     uint64         `gorm:"not null;index" json:"customer_id"`
+	CustomerName   string         `gorm:"type:varchar(128)" json:"customer_name"`
+	TotalAmount    float64        `gorm:"type:numeric(12,2);not null" json:"total_amount"`
+	DiscountAmount float64        `gorm:"type:numeric(12,2);default:0" json:"discount_amount"`
+	PayableAmount  float64        `gorm:"type:numeric(12,2);default:0" json:"payable_amount"`
+	OrderStatus    int16          `gorm:"default:1" json:"order_status"`
+	Remark         string         `gorm:"type:varchar(500)" json:"remark"`
+	CreatedAt      time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	CreatedBy      uint64         `gorm:"index" json:"created_by"`
+	UpdatedAt      time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedBy      uint64         `json:"updated_by"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"deleted_at"`
 }
 
 func (OrderGroup) TableName() string { return "order_group" }

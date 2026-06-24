@@ -141,7 +141,7 @@ type ShopResp struct {
 	Remark        string     `json:"remark"`
 	Status        int16      `json:"status"`
 	AdminUserID   *uint64    `json:"admin_user_id"`
-	AdminUsername  string    `json:"admin_username"`
+	AdminUsername string     `json:"admin_username"`
 	ExpiresAt     *time.Time `json:"expires_at"`
 	CreatedAt     time.Time  `json:"created_at"`
 	CreatedBy     uint64     `json:"created_by"`
@@ -298,14 +298,15 @@ type CategoryResp struct {
 // ========== Product ==========
 
 type ProductCreateReq struct {
-	ProductCode     string           `json:"product_code" binding:"required"`
-	ProductName     string           `json:"product_name" binding:"required"`
-	CategoryID      *uint64          `json:"category_id" binding:"required"`
-	Price           float64          `json:"price" binding:"required"`
-	Sort            int16            `json:"sort"`
-	Status          int16            `json:"status"`
-	MallProductCode string           `json:"mall_product_code"`
-	Description     string           `json:"description"`
+	ProductCode     string            `json:"product_code" binding:"required"`
+	ProductName     string            `json:"product_name" binding:"required"`
+	CategoryID      *uint64           `json:"category_id" binding:"required"`
+	Price           float64           `json:"price" binding:"required"`
+	Unit            string            `json:"unit"`
+	Sort            int16             `json:"sort"`
+	Status          int16             `json:"status"`
+	MallProductCode string            `json:"mall_product_code"`
+	Description     string            `json:"description"`
 	WorkflowNodes   []WorkflowNodeReq `json:"workflow_nodes" binding:"required,dive"`
 }
 
@@ -314,6 +315,7 @@ type ProductUpdateReq struct {
 	ProductName     string  `json:"product_name" binding:"required"`
 	CategoryID      *uint64 `json:"category_id"`
 	Price           float64 `json:"price"`
+	Unit            string  `json:"unit"`
 	Sort            int16   `json:"sort"`
 	Status          int16   `json:"status"`
 	MallProductCode string  `json:"mall_product_code"`
@@ -321,11 +323,11 @@ type ProductUpdateReq struct {
 }
 
 type ProductListReq struct {
-	Page       int    `form:"page"`
-	PageSize   int    `form:"page_size"`
-	ProductName string `form:"product_name"`
-	CategoryID *uint64 `form:"category_id"`
-	Status     *int16 `form:"status"`
+	Page        int     `form:"page"`
+	PageSize    int     `form:"page_size"`
+	ProductName string  `form:"product_name"`
+	CategoryID  *uint64 `form:"category_id"`
+	Status      *int16  `form:"status"`
 }
 
 type ProductStatusReq struct {
@@ -333,21 +335,22 @@ type ProductStatusReq struct {
 }
 
 type ProductResp struct {
-	ID              uint64            `json:"id"`
-	ProductCode     string            `json:"product_code"`
-	ProductName     string            `json:"product_name"`
-	CategoryID      *uint64           `json:"category_id"`
-	CategoryName    string            `json:"category_name"`
-	Price           float64           `json:"price"`
-	Sort            int16             `json:"sort"`
-	Status          int16             `json:"status"`
-	MallProductCode string            `json:"mall_product_code"`
-	Description     string            `json:"description"`
-	CreatedAt       time.Time         `json:"created_at"`
-	CreatedBy       uint64            `json:"created_by"`
-	CreatedByName   string            `json:"created_by_name"`
-	UpdatedAt       time.Time         `json:"updated_at"`
-	UpdatedBy       uint64            `json:"updated_by"`
+	ID              uint64             `json:"id"`
+	ProductCode     string             `json:"product_code"`
+	ProductName     string             `json:"product_name"`
+	CategoryID      *uint64            `json:"category_id"`
+	CategoryName    string             `json:"category_name"`
+	Price           float64            `json:"price"`
+	Unit            string             `json:"unit"`
+	Sort            int16              `json:"sort"`
+	Status          int16              `json:"status"`
+	MallProductCode string             `json:"mall_product_code"`
+	Description     string             `json:"description"`
+	CreatedAt       time.Time          `json:"created_at"`
+	CreatedBy       uint64             `json:"created_by"`
+	CreatedByName   string             `json:"created_by_name"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+	UpdatedBy       uint64             `json:"updated_by"`
 	WorkflowNodes   []WorkflowNodeResp `json:"workflow_nodes,omitempty"`
 }
 
@@ -440,13 +443,13 @@ type ShopFinCategoryResp struct {
 }
 
 type ShopFinCategoryAvailableResp struct {
-	ID           uint64                          `json:"id"`
-	ParentID     uint64                          `json:"parent_id"`
-	Level        int16                           `json:"level"`
-	CategoryType int16                           `json:"category_type"`
-	CategoryCode string                          `json:"category_code"`
-	CategoryName string                          `json:"category_name"`
-	Children     []ShopFinCategoryAvailableResp  `json:"children"`
+	ID           uint64                         `json:"id"`
+	ParentID     uint64                         `json:"parent_id"`
+	Level        int16                          `json:"level"`
+	CategoryType int16                          `json:"category_type"`
+	CategoryCode string                         `json:"category_code"`
+	CategoryName string                         `json:"category_name"`
+	Children     []ShopFinCategoryAvailableResp `json:"children"`
 }
 
 // ========== Shop Product ==========
@@ -519,12 +522,12 @@ type ShopCustomerUpdateReq struct {
 }
 
 type ShopCustomerListReq struct {
-	Page         int    `form:"page"`
-	PageSize     int    `form:"page_size"`
-	CustomerName string `form:"customer_name"`
+	Page          int    `form:"page"`
+	PageSize      int    `form:"page_size"`
+	CustomerName  string `form:"customer_name"`
 	ContactPerson string `form:"contact_person"`
-	CustomerType *int16 `form:"customer_type"`
-	Status       *int16 `form:"status"`
+	CustomerType  *int16 `form:"customer_type"`
+	Status        *int16 `form:"status"`
 }
 
 type ShopCustomerResp struct {
@@ -561,9 +564,10 @@ type OrderItemReq struct {
 }
 
 type OrderCreateReq struct {
-	CustomerID uint64         `json:"customer_id" binding:"required"`
-	Remark     string         `json:"remark"`
-	Items      []OrderItemReq `json:"items" binding:"required,min=1,dive"`
+	CustomerID     uint64         `json:"customer_id" binding:"required"`
+	Remark         string         `json:"remark"`
+	Items          []OrderItemReq `json:"items" binding:"required,min=1,dive"`
+	DiscountAmount float64        `json:"discount_amount"`
 }
 
 type OrderListReq struct {
@@ -591,19 +595,21 @@ type OrderItemResp struct {
 }
 
 type OrderResp struct {
-	ID            uint64          `json:"id"`
-	OrderNo       string          `json:"order_no"`
-	CustomerID    uint64          `json:"customer_id"`
-	CustomerName  string          `json:"customer_name"`
-	TotalAmount   float64         `json:"total_amount"`
-	OrderStatus   int16           `json:"order_status"`
-	Remark        string          `json:"remark"`
-	ItemCount     int             `json:"item_count"`
-	Items         []OrderItemResp `json:"items,omitempty"`
-	CreatedAt     time.Time       `json:"created_at"`
-	CreatedBy     uint64          `json:"created_by"`
-	CreatedByName string          `json:"created_by_name"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	ID             uint64          `json:"id"`
+	OrderNo        string          `json:"order_no"`
+	CustomerID     uint64          `json:"customer_id"`
+	CustomerName   string          `json:"customer_name"`
+	TotalAmount    float64         `json:"total_amount"`
+	DiscountAmount float64         `json:"discount_amount"`
+	PayableAmount  float64         `json:"payable_amount"`
+	OrderStatus    int16           `json:"order_status"`
+	Remark         string          `json:"remark"`
+	ItemCount      int             `json:"item_count"`
+	Items          []OrderItemResp `json:"items,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	CreatedBy      uint64          `json:"created_by"`
+	CreatedByName  string          `json:"created_by_name"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 
 type OrderWorkflowAdvanceReq struct {
@@ -673,7 +679,7 @@ type ShopFinAccountResp struct {
 }
 
 type FinanceRecordCreateReq struct {
-	AccountID    uint64  `json:"account_id" binding:"required"`
+	AccountID    uint64  `json:"account_id"`
 	CategoryID   uint64  `json:"category_id" binding:"required"`
 	RecordType   int16   `json:"record_type" binding:"required,oneof=1 2"`
 	Amount       float64 `json:"amount" binding:"required,gt=0"`
@@ -683,7 +689,7 @@ type FinanceRecordCreateReq struct {
 }
 
 type FinanceRecordUpdateReq struct {
-	AccountID    uint64  `json:"account_id" binding:"required"`
+	AccountID    uint64  `json:"account_id"`
 	CategoryID   uint64  `json:"category_id" binding:"required"`
 	RecordType   int16   `json:"record_type" binding:"required,oneof=1 2"`
 	Amount       float64 `json:"amount" binding:"required,gt=0"`
@@ -693,25 +699,26 @@ type FinanceRecordUpdateReq struct {
 }
 
 type FinanceRecordListReq struct {
-	Page         int     `form:"page"`
-	PageSize     int     `form:"page_size"`
-	RecordNo     string  `form:"record_no"`
-	AccountID    *uint64 `form:"account_id"`
-	AccountType  *int16  `form:"account_type"`
-	CategoryID   *uint64 `form:"category_id"`
-	CategoryL1   *string `form:"category_l1"`
-	CategoryL2   *string `form:"category_l2"`
-	CategoryL3   *string `form:"category_l3"`
-	RecordType   *int16  `form:"record_type"`
-	ReviewStatus *int16  `form:"review_status"`
-	RecordDateStart string `form:"record_date_start"`
-	RecordDateEnd   string `form:"record_date_end"`
-	CreatedBy    *uint64 `form:"created_by"`
+	Page            int     `form:"page"`
+	PageSize        int     `form:"page_size"`
+	RecordNo        string  `form:"record_no"`
+	AccountID       *uint64 `form:"account_id"`
+	AccountType     *int16  `form:"account_type"`
+	CategoryID      *uint64 `form:"category_id"`
+	CategoryL1      *string `form:"category_l1"`
+	CategoryL2      *string `form:"category_l2"`
+	CategoryL3      *string `form:"category_l3"`
+	RecordType      *int16  `form:"record_type"`
+	ReviewStatus    *int16  `form:"review_status"`
+	RecordDateStart string  `form:"record_date_start"`
+	RecordDateEnd   string  `form:"record_date_end"`
+	CreatedBy       *uint64 `form:"created_by"`
 }
 
 type FinanceReviewReq struct {
 	Action       string   `json:"action" binding:"required,oneof=approve reject"`
 	ActualAmount *float64 `json:"actual_amount"`
+	AccountID    *uint64  `json:"account_id"`
 	Notes        string   `json:"notes"`
 }
 
@@ -779,9 +786,9 @@ type FinanceTrendItem struct {
 }
 
 type ProfitLossCategory struct {
-	Name     string               `json:"name"`
-	Type     string               `json:"type"`
-	Subtotal float64              `json:"subtotal"`
+	Name     string                `json:"name"`
+	Type     string                `json:"type"`
+	Subtotal float64               `json:"subtotal"`
 	Children []*ProfitLossCategory `json:"children,omitempty" gorm:"-"`
 }
 
@@ -798,9 +805,9 @@ type PlatformFinanceReportReq struct {
 }
 
 type FinanceReportShopSummary struct {
-	ShopID     uint64  `json:"shop_id"`
-	ShopName   string  `json:"shop_name"`
-	Income     float64 `json:"income"`
-	Expense    float64 `json:"expense"`
-	NetProfit  float64 `json:"net_profit"`
+	ShopID    uint64  `json:"shop_id"`
+	ShopName  string  `json:"shop_name"`
+	Income    float64 `json:"income"`
+	Expense   float64 `json:"expense"`
+	NetProfit float64 `json:"net_profit"`
 }

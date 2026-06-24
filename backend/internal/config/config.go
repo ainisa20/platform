@@ -56,10 +56,10 @@ type MinIOConfig struct {
 }
 
 type JWTConfig struct {
-	Secret      string        `mapstructure:"secret"`
-	AccessTTL   time.Duration `mapstructure:"access_ttl"`
-	RefreshTTL  time.Duration `mapstructure:"refresh_ttl"`
-	Issuer      string        `mapstructure:"issuer"`
+	Secret     string        `mapstructure:"secret"`
+	AccessTTL  time.Duration `mapstructure:"access_ttl"`
+	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
+	Issuer     string        `mapstructure:"issuer"`
 }
 
 func Load(path string) *Config {

@@ -67,7 +67,7 @@ func (s *ShopFinCategoryService) Sync(db *gorm.DB, tenantID, createdBy uint64, r
 			}
 			return err
 		}
-		s.walkAncestors(db, cat, toSync, syncedMap)
+		s.walkAncestors(db, tenantID, cat, toSync, syncedMap)
 	}
 
 	if len(toSync) == 0 {
@@ -136,13 +136,19 @@ func (s *ShopFinCategoryService) CancelSync(db *gorm.DB, tenantID, id, userID ui
 	return s.repo.Delete(db, id, tenantID)
 }
 
-func (s *ShopFinCategoryService) walkAncestors(db *gorm.DB, cat *entity.FinanceCategory, toSync map[uint64]*entity.FinanceCategory, syncedMap map[uint64]bool) {
+func (s *ShopFinCategoryService) walkAncestors(db *gorm.DB, tenantID uint64, cat *entity.FinanceCategory, toSync map[uint64]*entity.FinanceCategory, syncedMap map[uint64]bool) {
 	if syncedMap[cat.ID] {
 		return
 	}
 	if _, exists := toSync[cat.ID]; exists {
 		return
 	}
+
+	if existing, err := s.repo.FindByPlatformID(db, tenantID, cat.ID); err == nil && existing != nil {
+		syncedMap[cat.ID] = true
+		return
+	}
+
 	toSync[cat.ID] = cat
 
 	if cat.ParentID != 0 {
@@ -150,7 +156,7 @@ func (s *ShopFinCategoryService) walkAncestors(db *gorm.DB, cat *entity.FinanceC
 		if err != nil {
 			return
 		}
-		s.walkAncestors(db, parent, toSync, syncedMap)
+		s.walkAncestors(db, tenantID, parent, toSync, syncedMap)
 	}
 }
 

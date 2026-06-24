@@ -185,9 +185,8 @@ async function handleExport() {
     ElMessage.warning('没有数据可导出')
     return
   }
-  const headers = ['记录号', '账户', '一级分类', '二级分类', '三级分类', '类型', '金额', '实际金额', '审核状态', '记账日期', '创建人', '创建时间']
+  const headers = ['收支账号', '一级分类', '二级分类', '三级分类', '类型', '金额', '实际金额', '审核状态', '记账日期', '创建人', '创建时间']
   const rows = data.map((r) => [
-    r.record_no,
     r.account_name,
     r.category_l1,
     r.category_l2,
@@ -318,7 +317,6 @@ const userOptions = ref<UserResp[]>([])
 const isReadonly = ref(false)
 
 interface RecordFormData {
-  account_id: number | null
   category_id: number | null
   category_l1_id: number | null
   category_l2_id: number | null
@@ -330,7 +328,6 @@ interface RecordFormData {
 }
 
 const defaultForm = (): RecordFormData => ({
-  account_id: null,
   category_id: null,
   category_l1_id: null,
   category_l2_id: null,
@@ -344,7 +341,6 @@ const defaultForm = (): RecordFormData => ({
 const formData = reactive<RecordFormData>(defaultForm())
 
 const formRules: FormRules = {
-  account_id: [{ required: true, message: '请选择账户', trigger: 'change' }],
   category_id: [{ required: true, message: '请选择三级分类', trigger: 'change' }],
   amount: [
     {
@@ -455,7 +451,6 @@ async function openEditDialog(row: FinanceRecordResp) {
   const r = res.data.data
   const path = findCategoryPath(r.category_id)
   Object.assign(formData, {
-    account_id: r.account_id,
     category_l1_id: path?.l1_id ?? null,
     category_l2_id: path?.l2_id ?? null,
     category_id: r.category_id,
@@ -481,7 +476,6 @@ async function openDetailDialog(row: FinanceRecordResp) {
   detailRecord.value = r
   const path = findCategoryPath(r.category_id)
   Object.assign(formData, {
-    account_id: r.account_id,
     category_l1_id: path?.l1_id ?? null,
     category_l2_id: path?.l2_id ?? null,
     category_id: r.category_id,
@@ -511,7 +505,6 @@ async function handleSubmit() {
   try {
     if (isEdit.value) {
       const data: FinanceRecordUpdateReq = {
-        account_id: formData.account_id as number,
         category_id: formData.category_id as number,
         record_type: formData.record_type,
         amount: formData.amount,
@@ -526,7 +519,6 @@ async function handleSubmit() {
       ElMessage.success('更新成功')
     } else {
       const data: FinanceRecordCreateReq = {
-        account_id: formData.account_id as number,
         category_id: formData.category_id as number,
         record_type: formData.record_type,
         amount: formData.amount,
@@ -579,7 +571,7 @@ async function handleDelete(row: FinanceRecordResp) {
     return
   }
   await ElMessageBox.confirm(
-    `确定要删除记录「${row.record_no}」吗？`,
+    `确定要删除记录「${row.category_l3} - ¥${row.amount}」吗？`,
     '删除确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   )
@@ -595,6 +587,7 @@ const currentRecord = ref<FinanceRecordResp | null>(null)
 const reviewForm = reactive({
   action: 'approve' as 'approve' | 'reject',
   actual_amount: 0,
+  account_id: null as number | null,
   notes: '',
 })
 
@@ -613,11 +606,25 @@ const reviewRules = reactive<FormRules>({
       trigger: 'blur',
     },
   ],
+  account_id: [
+    {
+      required: true,
+      validator: (_rule: unknown, value: number, callback: (err?: Error) => void) => {
+        if (reviewForm.action === 'approve' && !value) {
+          callback(new Error('请选择收支账号'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change',
+    },
+  ],
 })
 
 function resetReviewForm() {
   reviewForm.action = 'approve'
   reviewForm.actual_amount = 0
+  reviewForm.account_id = null
   reviewForm.notes = ''
 }
 
@@ -626,7 +633,10 @@ async function openReviewDialog(row: FinanceRecordResp) {
     ElMessage.warning('已审核通过的记录无需再次审核')
     return
   }
-  const res = await getRecord(row.id)
+  const [res] = await Promise.all([
+    getRecord(row.id),
+    accountOptions.value.length === 0 ? loadAccounts() : Promise.resolve(),
+  ])
   currentRecord.value = res.data.data
   resetReviewForm()
   reviewForm.actual_amount = res.data.data.amount
@@ -647,7 +657,7 @@ async function handleReviewSubmit() {
 
   const actionText = reviewForm.action === 'approve' ? '通过' : '驳回'
   await ElMessageBox.confirm(
-    `确定要${actionText}记录「${currentRecord.value.record_no}」吗？`,
+    `确定要${actionText}记录「${currentRecord.value.category_l3}」吗？`,
     '审核确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   )
@@ -660,6 +670,7 @@ async function handleReviewSubmit() {
     }
     if (reviewForm.action === 'approve') {
       data.actual_amount = reviewForm.actual_amount
+      data.account_id = reviewForm.account_id ?? undefined
     }
     await reviewRecord(currentRecord.value.id, data)
     ElMessage.success('审核成功')
@@ -733,9 +744,6 @@ onMounted(() => {
   <div class="record-page">
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm">
-        <el-form-item label="记录号">
-          <el-input v-model="searchForm.record_no" placeholder="请输入记录号" clearable style="width: 200px" />
-        </el-form-item>
         <el-form-item label="账户类型">
           <el-select v-model="searchForm.account_type" placeholder="全部" clearable style="width: 120px">
             <el-option label="对公" :value="1" />
@@ -809,16 +817,14 @@ onMounted(() => {
 
       <el-table v-loading="loading" :data="tableData" border stripe style="width: 100%">
         <el-table-column prop="id" label="序号" width="70" align="center" />
-        <el-table-column prop="record_no" label="记录号" min-width="180" />
         <el-table-column label="记账日期" min-width="110">
           <template #default="{ row }">
             {{ row.record_date || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="account_name" label="账户" min-width="120" />
-        <el-table-column label="账户类型" width="90" align="center">
+        <el-table-column label="创建人" min-width="90">
           <template #default="{ row }">
-            {{ row.account_type === 1 ? '对公' : row.account_type === 2 ? '对私' : '-' }}
+            {{ row.created_by_name || row.created_by || '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="category_l1" label="一级分类" min-width="110" />
@@ -836,11 +842,6 @@ onMounted(() => {
             {{ formatAmount(row.amount) }}
           </template>
         </el-table-column>
-        <el-table-column label="实际金额" width="120" align="right">
-          <template #default="{ row }">
-            {{ formatAmount(row.actual_amount) }}
-          </template>
-        </el-table-column>
         <el-table-column label="审核状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="reviewStatusTagType(row.review_status)" size="small">
@@ -848,9 +849,15 @@ onMounted(() => {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建人" min-width="90">
+        <el-table-column prop="account_name" label="收支账号" min-width="120" />
+        <el-table-column label="账户类型" width="90" align="center">
           <template #default="{ row }">
-            {{ row.created_by_name || row.created_by || '-' }}
+            {{ row.account_type === 1 ? '对公' : row.account_type === 2 ? '对私' : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="实际金额" width="120" align="right">
+          <template #default="{ row }">
+            {{ formatAmount(row.actual_amount) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="280" fixed="right" align="center">
@@ -957,16 +964,6 @@ onMounted(() => {
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="账户" prop="account_id">
-            <el-select v-model="formData.account_id" placeholder="请选择账户" filterable style="width: 100%">
-              <el-option
-                v-for="a in accountOptions"
-                :key="a.id"
-                :label="a.account_name"
-                :value="a.id"
-              />
-            </el-select>
-          </el-form-item>
           <el-form-item label="备注">
             <el-input
               v-model="formData.remark"
@@ -1049,14 +1046,14 @@ onMounted(() => {
 
     <el-dialog
       v-model="reviewDialogVisible"
-      :title="`审核记录 - ${currentRecord?.record_no || ''}`"
+      :title="`审核记录 - ${currentRecord?.category_l3 || ''}`"
       width="480px"
       :close-on-click-modal="false"
       destroy-on-close
     >
       <el-descriptions v-if="currentRecord" :column="1" border size="small" class="review-summary">
         <el-descriptions-item label="记录号">{{ currentRecord.record_no }}</el-descriptions-item>
-        <el-descriptions-item label="账户">{{ currentRecord.account_name }}</el-descriptions-item>
+        <el-descriptions-item label="收支账号">{{ currentRecord.account_name }}</el-descriptions-item>
           <el-descriptions-item label="一级分类">{{ currentRecord.category_l1 || '-' }}</el-descriptions-item>
           <el-descriptions-item label="二级分类">{{ currentRecord.category_l2 || '-' }}</el-descriptions-item>
           <el-descriptions-item label="三级分类">{{ currentRecord.category_l3 || '-' }}</el-descriptions-item>
@@ -1078,6 +1075,16 @@ onMounted(() => {
             :step="100"
             style="width: 100%"
           />
+        </el-form-item>
+        <el-form-item v-if="reviewForm.action === 'approve'" label="收支账号" prop="account_id">
+          <el-select v-model="reviewForm.account_id" placeholder="请选择收支账号" filterable style="width: 100%">
+            <el-option
+              v-for="a in accountOptions"
+              :key="a.id"
+              :label="a.account_name"
+              :value="a.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="审核备注">
           <el-input

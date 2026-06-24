@@ -85,18 +85,20 @@ func (s *OrderService) List(c *gin.Context, db *gorm.DB, tenantID uint64, req *d
 			itemCount = len(items)
 		}
 		resp := dto.OrderResp{
-			ID:            g.ID,
-			OrderNo:       g.OrderNo,
-			CustomerID:    g.CustomerID,
-			CustomerName:  g.CustomerName,
-			TotalAmount:   g.TotalAmount,
-			OrderStatus:   g.OrderStatus,
-			Remark:        g.Remark,
-			ItemCount:     itemCount,
-			CreatedAt:     g.CreatedAt,
-			CreatedBy:     g.CreatedBy,
-			CreatedByName: nameMap[g.CreatedBy],
-			UpdatedAt:     g.UpdatedAt,
+			ID:             g.ID,
+			OrderNo:        g.OrderNo,
+			CustomerID:     g.CustomerID,
+			CustomerName:   g.CustomerName,
+			TotalAmount:    g.TotalAmount,
+			DiscountAmount: g.DiscountAmount,
+			PayableAmount:  g.PayableAmount,
+			OrderStatus:    g.OrderStatus,
+			Remark:         g.Remark,
+			ItemCount:      itemCount,
+			CreatedAt:      g.CreatedAt,
+			CreatedBy:      g.CreatedBy,
+			CreatedByName:  nameMap[g.CreatedBy],
+			UpdatedAt:      g.UpdatedAt,
 		}
 		list = append(list, resp)
 	}
@@ -177,18 +179,20 @@ func (s *OrderService) Get(c *gin.Context, db *gorm.DB, tenantID, id uint64) (*d
 		})
 	}
 	resp := &dto.OrderResp{
-		ID:           group.ID,
-		OrderNo:      group.OrderNo,
-		CustomerID:   group.CustomerID,
-		CustomerName: group.CustomerName,
-		TotalAmount:  group.TotalAmount,
-		OrderStatus:  group.OrderStatus,
-		Remark:       group.Remark,
-		ItemCount:    len(items),
-		Items:        itemResps,
-		CreatedAt:    group.CreatedAt,
-		CreatedBy:    group.CreatedBy,
-		UpdatedAt:    group.UpdatedAt,
+		ID:             group.ID,
+		OrderNo:        group.OrderNo,
+		CustomerID:     group.CustomerID,
+		CustomerName:   group.CustomerName,
+		TotalAmount:    group.TotalAmount,
+		DiscountAmount: group.DiscountAmount,
+		PayableAmount:  group.PayableAmount,
+		OrderStatus:    group.OrderStatus,
+		Remark:         group.Remark,
+		ItemCount:      len(items),
+		Items:          itemResps,
+		CreatedAt:      group.CreatedAt,
+		CreatedBy:      group.CreatedBy,
+		UpdatedAt:      group.UpdatedAt,
 	}
 	if group.CreatedBy != 0 {
 		nameMap := s.fetchUserNames(db, []uint64{group.CreatedBy})
@@ -255,16 +259,26 @@ func (s *OrderService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy u
 			total := metas[i].ShopPrice * float64(it.Quantity)
 			totalAmount += total
 		}
+		totalAmountRounded := round2(totalAmount)
+		discount := req.DiscountAmount
+		if discount < 0 {
+			discount = 0
+		}
+		if discount > totalAmountRounded {
+			discount = totalAmountRounded
+		}
 		group := &entity.OrderGroup{
-			TenantID:     tenantID,
-			OrderNo:      orderNo,
-			CustomerID:   customer.ID,
-			CustomerName: customer.CustomerName,
-			TotalAmount:  round2(totalAmount),
-			OrderStatus:  orderStatusPending,
-			Remark:       req.Remark,
-			CreatedBy:    createdBy,
-			UpdatedBy:    createdBy,
+			TenantID:       tenantID,
+			OrderNo:        orderNo,
+			CustomerID:     customer.ID,
+			CustomerName:   customer.CustomerName,
+			TotalAmount:    totalAmountRounded,
+			DiscountAmount: round2(discount),
+			PayableAmount:  round2(totalAmountRounded - discount),
+			OrderStatus:    orderStatusPending,
+			Remark:         req.Remark,
+			CreatedBy:      createdBy,
+			UpdatedBy:      createdBy,
 		}
 		if err := s.repo.CreateGroup(tx, group); err != nil {
 			return fmt.Errorf("create order group: %w", err)
@@ -509,19 +523,18 @@ func (s *OrderService) AdvanceItemWorkflow(c *gin.Context, db *gorm.DB, tenantID
 		return 0, shared.ErrWorkflowEmpty
 	}
 	currentIndex := item.CurrentNodeIndex
-	if int(currentIndex) >= len(nodes)-1 {
+	if int(currentIndex) >= len(nodes) {
 		return 0, errors.New("已到达最后节点")
 	}
-	nextIndex := currentIndex + 1
-	nextNode := nodes[nextIndex]
+	currentNode := nodes[currentIndex]
 	var logID uint64
 	err = db.Transaction(func(tx *gorm.DB) error {
 		log := &entity.OrderWorkflowLog{
 			TenantID:     tenantID,
 			OrderItemID:  item.ID,
-			NodeIndex:    nextNode.NodeIndex,
-			NodeCode:     nextNode.NodeCode,
-			NodeName:     nextNode.NodeName,
+			NodeIndex:    currentNode.NodeIndex,
+			NodeCode:     currentNode.NodeCode,
+			NodeName:     currentNode.NodeName,
 			Notes:        req.Notes,
 			OperatorID:   userID,
 			OperatorName: userName,
@@ -530,10 +543,10 @@ func (s *OrderService) AdvanceItemWorkflow(c *gin.Context, db *gorm.DB, tenantID
 			return fmt.Errorf("create workflow log: %w", err)
 		}
 		logID = log.ID
-		item.CurrentNodeIndex = nextIndex
-		if nextIndex == int16(len(nodes)-1) {
+		if int(currentIndex) == len(nodes)-1 {
 			item.ItemStatus = orderItemStatusCompleted
 		} else {
+			item.CurrentNodeIndex = currentIndex + 1
 			item.ItemStatus = orderItemStatusInProcess
 		}
 		item.UpdatedBy = userID
@@ -812,8 +825,6 @@ func (s *OrderService) fetchUserNames(db *gorm.DB, ids []uint64) map[uint64]stri
 	}
 	return result
 }
-
-
 
 func collectOrderCreatedBy(groups []entity.OrderGroup) []uint64 {
 	idSet := make(map[uint64]struct{}, len(groups))

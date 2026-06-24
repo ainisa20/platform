@@ -66,12 +66,12 @@ func (s *ShopProductService) ListPlatformAvailable(db *gorm.DB, tenantID uint64)
 	for i := range platProducts {
 		p := &platProducts[i]
 		resp := dto.ShopPlatformProductResp{
-			ID:           p.ID,
-			ProductCode:  p.ProductCode,
-			ProductName:  p.ProductName,
-			Price:        p.Price,
-			CategoryID:   p.CategoryID,
-			Description:  p.Description,
+			ID:          p.ID,
+			ProductCode: p.ProductCode,
+			ProductName: p.ProductName,
+			Price:       p.Price,
+			CategoryID:  p.CategoryID,
+			Description: p.Description,
 		}
 		if p.CategoryID != nil {
 			if name, ok := catMap[*p.CategoryID]; ok {

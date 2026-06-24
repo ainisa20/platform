@@ -5,8 +5,8 @@ import (
 
 	"platform/internal/model/dto"
 	"platform/internal/pkg/response"
-	shopsvc "platform/internal/service/shop"
 	"platform/internal/service/shared"
+	shopsvc "platform/internal/service/shop"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

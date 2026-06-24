@@ -12,10 +12,10 @@ const (
 )
 
 const (
-	DataScopeAll         int16 = 1
-	DataScopeDeptAndSub  int16 = 2
-	DataScopeDeptOnly    int16 = 3
-	DataScopeSelfOnly    int16 = 4
+	DataScopeAll        int16 = 1
+	DataScopeDeptAndSub int16 = 2
+	DataScopeDeptOnly   int16 = 3
+	DataScopeSelfOnly   int16 = 4
 )
 
 const (

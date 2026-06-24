@@ -153,15 +153,19 @@ func (s *RecordService) Get(c *gin.Context, db *gorm.DB, id, tenantID uint64) (*
 
 func (s *RecordService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy uint64, req *dto.FinanceRecordCreateReq) (*dto.FinanceRecordResp, error) {
 	_ = c
-	account, err := s.accountRepo.GetByID(db, req.AccountID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	var account *entity.ShopFinanceAccount
+	if req.AccountID != 0 {
+		acc, err := s.accountRepo.GetByID(db, req.AccountID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, shared.ErrFinRecordAccountInvalid
+			}
+			return nil, err
+		}
+		if acc.TenantID != tenantID {
 			return nil, shared.ErrFinRecordAccountInvalid
 		}
-		return nil, err
-	}
-	if account.TenantID != tenantID {
-		return nil, shared.ErrFinRecordAccountInvalid
+		account = acc
 	}
 
 	category, err := s.categoryRepo.GetByID(db, req.CategoryID)
@@ -204,27 +208,30 @@ func (s *RecordService) Create(c *gin.Context, db *gorm.DB, tenantID, createdBy 
 	recordNo := s.generateRecordNo(db, tenantID)
 
 	rec := &entity.FinanceRecord{
-		TenantID:              tenantID,
-		RecordNo:              recordNo,
-		AccountID:             account.ID,
-		AccountName:           account.AccountName,
-		AccountType:           account.AccountType,
-		AccountInitialBalance: account.InitialBalance,
-		CategoryID:            category.ID,
-		CategoryName:          category.CategoryName,
-		CategoryPath:          categoryPath,
-		CategoryL1:            levels[0],
-		CategoryL2:            levels[1],
-		CategoryL3:            levels[2],
-		RecordType:            req.RecordType,
-		Amount:                req.Amount,
-		ActualAmount:          0,
-		OrderGroupID:          req.OrderGroupID,
-		ReviewStatus:          financeRecordReviewStatusPending,
-		RecordDate:            recordDate,
-		Remark:                req.Remark,
-		CreatedBy:             createdBy,
-		UpdatedBy:             createdBy,
+		TenantID:     tenantID,
+		RecordNo:     recordNo,
+		CategoryID:   category.ID,
+		CategoryName: category.CategoryName,
+		CategoryPath: categoryPath,
+		CategoryL1:   levels[0],
+		CategoryL2:   levels[1],
+		CategoryL3:   levels[2],
+		RecordType:   req.RecordType,
+		Amount:       req.Amount,
+		ActualAmount: 0,
+		OrderGroupID: req.OrderGroupID,
+		ReviewStatus: financeRecordReviewStatusPending,
+		RecordDate:   recordDate,
+		Remark:       req.Remark,
+		CreatedBy:    createdBy,
+		UpdatedBy:    createdBy,
+	}
+
+	if account != nil {
+		rec.AccountID = account.ID
+		rec.AccountName = account.AccountName
+		rec.AccountType = account.AccountType
+		rec.AccountInitialBalance = account.InitialBalance
 	}
 
 	if err := s.repo.Create(db, rec); err != nil {
@@ -254,15 +261,19 @@ func (s *RecordService) Update(c *gin.Context, db *gorm.DB, tenantID, id, update
 		return shared.ErrFinRecordApproved
 	}
 
-	account, err := s.accountRepo.GetByID(db, req.AccountID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	var account *entity.ShopFinanceAccount
+	if req.AccountID != 0 {
+		acc, err := s.accountRepo.GetByID(db, req.AccountID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return shared.ErrFinRecordAccountInvalid
+			}
+			return err
+		}
+		if acc.TenantID != tenantID {
 			return shared.ErrFinRecordAccountInvalid
 		}
-		return err
-	}
-	if account.TenantID != tenantID {
-		return shared.ErrFinRecordAccountInvalid
+		account = acc
 	}
 
 	category, err := s.categoryRepo.GetByID(db, req.CategoryID)
@@ -302,7 +313,6 @@ func (s *RecordService) Update(c *gin.Context, db *gorm.DB, tenantID, id, update
 		return err
 	}
 
-	rec.AccountID = account.ID
 	rec.CategoryID = category.ID
 	rec.CategoryName = category.CategoryName
 	rec.CategoryPath = categoryPath
@@ -315,6 +325,13 @@ func (s *RecordService) Update(c *gin.Context, db *gorm.DB, tenantID, id, update
 	rec.RecordDate = recordDate
 	rec.Remark = req.Remark
 	rec.UpdatedBy = updatedBy
+
+	if account != nil {
+		rec.AccountID = account.ID
+		rec.AccountName = account.AccountName
+		rec.AccountType = account.AccountType
+		rec.AccountInitialBalance = account.InitialBalance
+	}
 
 	if rec.ReviewStatus == financeRecordReviewStatusRejected {
 		rec.ReviewStatus = financeRecordReviewStatusPending
@@ -369,6 +386,23 @@ func (s *RecordService) Review(c *gin.Context, db *gorm.DB, tenantID, id, userID
 		if req.ActualAmount == nil || *req.ActualAmount <= 0 {
 			return shared.ErrFinRecordActualAmountRequired
 		}
+		if req.AccountID == nil || *req.AccountID == 0 {
+			return shared.ErrFinRecordAccountInvalid
+		}
+		account, err := s.accountRepo.GetByID(db, *req.AccountID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return shared.ErrFinRecordAccountInvalid
+			}
+			return err
+		}
+		if account.TenantID != tenantID {
+			return shared.ErrFinRecordAccountInvalid
+		}
+		rec.AccountID = account.ID
+		rec.AccountName = account.AccountName
+		rec.AccountType = account.AccountType
+		rec.AccountInitialBalance = account.InitialBalance
 		rec.ActualAmount = *req.ActualAmount
 		rec.ReviewStatus = financeRecordReviewStatusApproved
 	case "reject":
