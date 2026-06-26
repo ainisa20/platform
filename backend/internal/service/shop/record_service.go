@@ -92,6 +92,24 @@ func (s *RecordService) List(c *gin.Context, db *gorm.DB, tenantID uint64, req *
 	if req.ReviewStatus != nil {
 		q = q.Where("review_status = ?", *req.ReviewStatus)
 	}
+	if req.AccountType != nil {
+		q = q.Where("account_type = ?", *req.AccountType)
+	}
+	if req.RecordDateStart != "" {
+		q = q.Where("record_date >= ?", req.RecordDateStart)
+	}
+	if req.RecordDateEnd != "" {
+		q = q.Where("record_date <= ?", req.RecordDateEnd)
+	}
+	if req.PostedDateStart != "" {
+		q = q.Where("posted_date >= ?", req.PostedDateStart)
+	}
+	if req.PostedDateEnd != "" {
+		q = q.Where("posted_date <= ?", req.PostedDateEnd)
+	}
+	if req.CreatedBy != nil {
+		q = q.Where("created_by = ?", *req.CreatedBy)
+	}
 
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
@@ -404,6 +422,7 @@ func (s *RecordService) Review(c *gin.Context, db *gorm.DB, tenantID, id, userID
 		rec.AccountType = account.AccountType
 		rec.AccountInitialBalance = account.InitialBalance
 		rec.ActualAmount = *req.ActualAmount
+		rec.PostedDate = req.PostedDate
 		rec.ReviewStatus = financeRecordReviewStatusApproved
 	case "reject":
 		rec.ActualAmount = 0
@@ -663,6 +682,7 @@ func recordToResp(r *entity.FinanceRecord) dto.FinanceRecordResp {
 		RecordType:            r.RecordType,
 		Amount:                r.Amount,
 		ActualAmount:          r.ActualAmount,
+		PostedDate:            r.PostedDate,
 		OrderGroupID:          r.OrderGroupID,
 		ReviewStatus:          r.ReviewStatus,
 		ReviewBy:              r.ReviewBy,

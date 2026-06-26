@@ -712,14 +712,17 @@ type FinanceRecordListReq struct {
 	ReviewStatus    *int16  `form:"review_status"`
 	RecordDateStart string  `form:"record_date_start"`
 	RecordDateEnd   string  `form:"record_date_end"`
+	PostedDateStart string  `form:"posted_date_start"`
+	PostedDateEnd   string  `form:"posted_date_end"`
 	CreatedBy       *uint64 `form:"created_by"`
 }
 
 type FinanceReviewReq struct {
-	Action       string   `json:"action" binding:"required,oneof=approve reject"`
-	ActualAmount *float64 `json:"actual_amount"`
-	AccountID    *uint64  `json:"account_id"`
-	Notes        string   `json:"notes"`
+	Action       string     `json:"action" binding:"required,oneof=approve reject"`
+	ActualAmount *float64   `json:"actual_amount"`
+	AccountID    *uint64    `json:"account_id"`
+	PostedDate   *time.Time `json:"posted_date"`
+	Notes        string     `json:"notes"`
 }
 
 type FinanceRecordResp struct {
@@ -738,6 +741,7 @@ type FinanceRecordResp struct {
 	RecordType            int16      `json:"record_type"`
 	Amount                float64    `json:"amount"`
 	ActualAmount          float64    `json:"actual_amount"`
+	PostedDate            *time.Time `json:"posted_date"`
 	OrderGroupID          *uint64    `json:"order_group_id"`
 	ReviewStatus          int16      `json:"review_status"`
 	ReviewBy              uint64     `json:"review_by"`

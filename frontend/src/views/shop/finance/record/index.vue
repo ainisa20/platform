@@ -71,6 +71,7 @@ const searchForm = reactive({
   category_l3: '',
   review_status: null as number | null,
   record_date_range: [] as string[],
+  posted_date_range: [] as string[],
   created_by: null as number | null,
 })
 
@@ -105,6 +106,8 @@ async function fetchList() {
       review_status: searchForm.review_status ?? undefined,
       record_date_start: searchForm.record_date_range?.[0] || undefined,
       record_date_end: searchForm.record_date_range?.[1] || undefined,
+      posted_date_start: searchForm.posted_date_range?.[0] || undefined,
+      posted_date_end: searchForm.posted_date_range?.[1] || undefined,
       created_by: searchForm.created_by ?? undefined,
     })
     tableData.value = res.data.data.list
@@ -127,6 +130,7 @@ function handleReset() {
   searchForm.category_l3 = ''
   searchForm.review_status = null
   searchForm.record_date_range = []
+  searchForm.posted_date_range = []
   searchForm.created_by = null
   pagination.page = 1
   fetchList()
@@ -586,6 +590,7 @@ const reviewFormRef = ref<FormInstance>()
 const currentRecord = ref<FinanceRecordResp | null>(null)
 const reviewForm = reactive({
   action: 'approve' as 'approve' | 'reject',
+  posted_date: '' as string,
   actual_amount: 0,
   account_id: null as number | null,
   notes: '',
@@ -623,6 +628,7 @@ const reviewRules = reactive<FormRules>({
 
 function resetReviewForm() {
   reviewForm.action = 'approve'
+  reviewForm.posted_date = ''
   reviewForm.actual_amount = 0
   reviewForm.account_id = null
   reviewForm.notes = ''
@@ -671,6 +677,7 @@ async function handleReviewSubmit() {
     if (reviewForm.action === 'approve') {
       data.actual_amount = reviewForm.actual_amount
       data.account_id = reviewForm.account_id ?? undefined
+      data.posted_date = reviewForm.posted_date || undefined
     }
     await reviewRecord(currentRecord.value.id, data)
     ElMessage.success('审核成功')
@@ -783,6 +790,17 @@ onMounted(() => {
             style="width: 260px"
           />
         </el-form-item>
+        <el-form-item label="入账日期">
+          <el-date-picker
+            v-model="searchForm.posted_date_range"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            style="width: 260px"
+          />
+        </el-form-item>
         <el-form-item label="创建人">
           <el-select v-model="searchForm.created_by" placeholder="全部" clearable filterable style="width: 140px">
             <el-option v-for="u in userOptions" :key="u.id" :label="u.real_name || u.username" :value="u.id" />
@@ -842,6 +860,7 @@ onMounted(() => {
             {{ formatAmount(row.amount) }}
           </template>
         </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
         <el-table-column label="审核状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="reviewStatusTagType(row.review_status)" size="small">
@@ -858,6 +877,11 @@ onMounted(() => {
         <el-table-column label="实际金额" width="120" align="right">
           <template #default="{ row }">
             {{ formatAmount(row.actual_amount) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="入账日期" width="120" align="center">
+          <template #default="{ row }">
+            {{ row.posted_date ? row.posted_date.substring(0, 10) : '-' }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="280" fixed="right" align="center">
@@ -1066,6 +1090,15 @@ onMounted(() => {
             <el-radio value="approve">通过</el-radio>
             <el-radio value="reject">驳回</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="reviewForm.action === 'approve'" label="入账日期" prop="posted_date">
+          <el-date-picker
+            v-model="reviewForm.posted_date"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="请选择银行入账日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item v-if="reviewForm.action === 'approve'" label="实际金额" prop="actual_amount">
           <el-input-number

@@ -727,6 +727,23 @@ onMounted(() => {
           </div>
         </div>
         <el-empty v-else-if="!detailLoading && currentOrder" description="暂无商品明细" />
+
+      <div class="print-footer">
+        <table class="footer-table">
+          <tr>
+            <td class="footer-section-label">记录信息</td>
+            <td>业务员：</td>
+            <td>审核员：</td>
+            <td>记录员：</td>
+          </tr>
+          <tr>
+            <td class="footer-section-label">提成信息</td>
+            <td>订单金额：</td>
+            <td>提成金额：</td>
+            <td>发放日期：</td>
+          </tr>
+        </table>
+      </div>
       </div>
       <template #footer>
         <el-button @click="handlePrintOrder">打印</el-button>
@@ -1064,5 +1081,16 @@ onMounted(() => {
   .inline-advance-form,
   .el-button { display: none !important; }
   .product-card { break-inside: avoid; }
+  /* 隐藏服务流程 */
+  .workflow-section { display: none !important; }
+  /* 表尾默认隐藏，仅打印时显示 */
+  .print-footer { display: block !important; margin-top: 30px; }
+  .footer-table { width: 100%; border-collapse: collapse; }
+  .footer-table td { border: 1px solid #303133; padding: 16px 12px; font-size: 14px; text-align: left; }
+  .footer-section-label { width: 80px; font-weight: 700; text-align: center !important; background: #f5f7fa; }
 }
+</style>
+
+<style scoped>
+.print-footer { display: none; }
 </style>

@@ -404,6 +404,7 @@ type FinanceRecord struct {
 	RecordType            int16          `gorm:"not null" json:"record_type"`
 	Amount                float64        `gorm:"type:numeric(12,2);not null" json:"amount"`
 	ActualAmount          float64        `gorm:"type:numeric(12,2);default:0" json:"actual_amount"`
+	PostedDate            *time.Time     `json:"posted_date"`
 	OrderGroupID          *uint64        `gorm:"index" json:"order_group_id"`
 	ReviewStatus          int16          `gorm:"default:1" json:"review_status"`
 	ReviewBy              uint64         `json:"review_by"`

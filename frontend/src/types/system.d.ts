@@ -680,6 +680,8 @@ export interface FinanceRecordListReq extends PageReq {
   review_status?: number | null
   record_date_start?: string
   record_date_end?: string
+  posted_date_start?: string
+  posted_date_end?: string
   created_by?: number | null
 }
 
@@ -687,6 +689,7 @@ export interface FinanceReviewReq {
   action: 'approve' | 'reject'
   actual_amount?: number
   account_id?: number
+  posted_date?: string
   notes?: string
 }
 
@@ -706,6 +709,7 @@ export interface FinanceRecordResp {
   record_type: number
   amount: number
   actual_amount: number
+  posted_date: string | null
   order_group_id: number | null
   review_status: number
   review_by: number
