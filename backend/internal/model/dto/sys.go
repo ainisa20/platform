@@ -718,11 +718,11 @@ type FinanceRecordListReq struct {
 }
 
 type FinanceReviewReq struct {
-	Action       string     `json:"action" binding:"required,oneof=approve reject"`
-	ActualAmount *float64   `json:"actual_amount"`
-	AccountID    *uint64    `json:"account_id"`
-	PostedDate   *time.Time `json:"posted_date"`
-	Notes        string     `json:"notes"`
+	Action       string   `json:"action" binding:"required,oneof=approve reject"`
+	ActualAmount *float64 `json:"actual_amount"`
+	AccountID    *uint64  `json:"account_id"`
+	PostedDate   *string  `json:"posted_date"`
+	Notes        string   `json:"notes"`
 }
 
 type FinanceRecordResp struct {

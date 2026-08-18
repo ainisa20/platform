@@ -422,7 +422,13 @@ func (s *RecordService) Review(c *gin.Context, db *gorm.DB, tenantID, id, userID
 		rec.AccountType = account.AccountType
 		rec.AccountInitialBalance = account.InitialBalance
 		rec.ActualAmount = *req.ActualAmount
-		rec.PostedDate = req.PostedDate
+		if req.PostedDate != nil && *req.PostedDate != "" {
+			t, err := time.Parse("2006-01-02", *req.PostedDate)
+			if err != nil {
+				return fmt.Errorf("posted_date 格式错误: %w", err)
+			}
+			rec.PostedDate = &t
+		}
 		rec.ReviewStatus = financeRecordReviewStatusApproved
 	case "reject":
 		rec.ActualAmount = 0
