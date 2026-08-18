@@ -113,7 +113,6 @@ func (s *UserService) Create(db *gorm.DB, tenantID, createdBy uint64, req *dto.U
 
 	return user, nil
 }
-
 func (s *UserService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.UserUpdateReq, dataScope int16, currentUserDeptID uint64, currentUserID uint64, tenantID uint64) error {
 	if dataScope != enum.DataScopeAll {
 		if req.DeptID != nil {
@@ -196,6 +195,7 @@ func (s *UserService) Update(db *gorm.DB, id, updatedBy uint64, req *dto.UserUpd
 		if err := s.userRepo.AssignRoles(db, id, tenantID, req.RoleIDs); err != nil {
 			return err
 		}
+		middleware.InvalidateUserPermsCache(tenantID, id)
 	}
 
 	return nil
@@ -208,7 +208,11 @@ func (s *UserService) Delete(db *gorm.DB, id, tenantID uint64) error {
 		}
 		return err
 	}
-	return s.userRepo.Delete(db, id, tenantID)
+	if err := s.userRepo.Delete(db, id, tenantID); err != nil {
+		return err
+	}
+	middleware.InvalidateUserPermsCache(tenantID, id)
+	return nil
 }
 
 func (s *UserService) GetByID(db *gorm.DB, id uint64) (*dto.UserResp, error) {
@@ -267,7 +271,11 @@ func (s *UserService) AssignRoles(db *gorm.DB, userID, tenantID uint64, roleIDs 
 		}
 		return err
 	}
-	return s.userRepo.AssignRoles(db, userID, tenantID, roleIDs)
+	if err := s.userRepo.AssignRoles(db, userID, tenantID, roleIDs); err != nil {
+		return err
+	}
+	middleware.InvalidateUserPermsCache(tenantID, userID)
+	return nil
 }
 
 func (s *UserService) loadRolesBrief(db *gorm.DB, roleIDs []uint64) ([]dto.RoleResp, error) {

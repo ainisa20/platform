@@ -23,6 +23,53 @@ func InitRBAC(db *gorm.DB, rdb *redis.Client) {
 	rbacRDB = rdb
 }
 
+// InvalidateUserPermsCache removes the cached permission list for a single user.
+// Call after a user's role assignments change so the next RBAC check reloads
+// fresh permissions from the database instead of serving the stale cache.
+func InvalidateUserPermsCache(tenantID, userID uint64) {
+	if rbacRDB == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_ = rbacRDB.Del(ctx, fmt.Sprintf("perms:%d:%d", tenantID, userID)).Err()
+}
+
+// InvalidateRolePermsCache removes the cached permission lists for every user
+// that holds the given role. Call after a role's permission set changes so all
+// affected users pick up the new permissions immediately.
+func InvalidateRolePermsCache(db *gorm.DB, roleID, tenantID uint64) {
+	if rbacRDB == nil || db == nil {
+		return
+	}
+	var userIDs []uint64
+	if err := db.Table("sys_user_role").
+		Where("role_id = ?", roleID).
+		Pluck("user_id", &userIDs).Error; err != nil {
+		return
+	}
+	for _, uid := range userIDs {
+		InvalidateUserPermsCache(tenantID, uid)
+	}
+}
+
+// InvalidateAllPermsCache removes every cached permission list.
+// Call after permission manifest sync so users of all tenants pick up
+// added/removed permissions without waiting for the cache TTL to expire.
+func InvalidateAllPermsCache() {
+	if rbacRDB == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	iter := rbacRDB.Scan(ctx, 0, "perms:*", 100).Iterator()
+	for iter.Next(ctx) {
+		_ = rbacRDB.Del(ctx, iter.Val()).Err()
+	}
+	_ = iter.Err()
+}
+
 // permImplies maps a permission to the permissions it automatically implies.
 // When a user holds the key permission, they can also pass checks for the
 // implied permissions without explicit assignment.

@@ -3,6 +3,7 @@ package permission
 import (
 	"time"
 
+	"platform/internal/middleware"
 	"platform/internal/model/entity"
 	"platform/internal/model/enum"
 
@@ -18,6 +19,7 @@ func SyncPermissions(db *gorm.DB, manifests ...Manifest) error {
 			return err
 		}
 	}
+	middleware.InvalidateAllPermsCache()
 	return nil
 }
 

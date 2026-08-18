@@ -3,6 +3,7 @@ package platform
 import (
 	"errors"
 
+	"platform/internal/middleware"
 	"platform/internal/model/dto"
 	"platform/internal/model/entity"
 	"platform/internal/model/enum"
@@ -93,7 +94,11 @@ func (s *RoleService) Delete(db *gorm.DB, id uint64) error {
 		}
 		return err
 	}
-	return s.roleRepo.Delete(db, id)
+	if err := s.roleRepo.Delete(db, id); err != nil {
+		return err
+	}
+	middleware.InvalidateRolePermsCache(db, id, 0)
+	return nil
 }
 
 func (s *RoleService) GetByID(db *gorm.DB, id, tenantID uint64) (*dto.RoleResp, error) {
@@ -168,7 +173,11 @@ func (s *RoleService) AssignPermissions(db *gorm.DB, roleID, tenantID uint64, re
 		}
 	}
 
-	return s.roleRepo.AssignPermissions(db, roleID, tenantID, req.PermissionIDs)
+	if err := s.roleRepo.AssignPermissions(db, roleID, tenantID, req.PermissionIDs); err != nil {
+		return err
+	}
+	middleware.InvalidateRolePermsCache(db, roleID, tenantID)
+	return nil
 }
 
 func (s *RoleService) GetPermissionTree(db *gorm.DB, systemType string, currentUserID uint64, dataScope int16, tenantID uint64) ([]dto.PermissionResp, error) {
